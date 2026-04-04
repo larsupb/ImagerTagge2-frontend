@@ -1,4 +1,27 @@
+import type {
+  DatasetInfo,
+  MediaItem,
+  GalleryResponse,
+  TagCloudEntry,
+  SearchReplacePreview,
+  Settings,
+  Tagger,
+  Upscaler,
+  BucketResult,
+  ProjectOpenResponse,
+  ActiveProjectsResponse,
+  RecentProjectsResponse,
+} from "./types";
+
 let sessionId: string | null = null;
+
+export function setSessionId(id: string | null) {
+  sessionId = id;
+}
+
+export function getCurrentSessionId(): string | null {
+  return sessionId;
+}
 
 export async function getSessionId(): Promise<string> {
   if (sessionId) return sessionId;
@@ -33,24 +56,59 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
-import type {
-  DatasetInfo, MediaItem, GalleryResponse, TagCloudEntry,
-  SearchReplacePreview, Settings, Tagger, Upscaler, BucketResult,
-} from "./types";
-
 export const api = {
+  // Project management
+  openProject: (
+    path: string,
+    masksPath?: string,
+    onlyMissing = false,
+    subdirs = false
+  ) =>
+    fetch("/api/projects/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path,
+        masks_path: masksPath,
+        only_missing_captions: onlyMissing,
+        include_subdirectories: subdirs,
+      }),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Failed to open project");
+      return res.json() as Promise<ProjectOpenResponse>;
+    }),
+
+  closeProject: (sessionId: string) =>
+    fetch(`/api/projects/${sessionId}`, { method: "DELETE" }).then((res) => {
+      if (!res.ok) throw new Error("Failed to close project");
+      return res.json();
+    }),
+
+  getActiveProjects: () =>
+    fetch("/api/projects/").then((res) => {
+      if (!res.ok) throw new Error("Failed to get active projects");
+      return res.json() as Promise<ActiveProjectsResponse>;
+    }),
+
+  getRecentProjects: (limit = 10) =>
+    fetch(`/api/projects/recent?limit=${limit}`).then((res) => {
+      if (!res.ok) throw new Error("Failed to get recent projects");
+      return res.json() as Promise<RecentProjectsResponse>;
+    }),
+
+  // Dataset (backward compatible)
   loadDataset: (path: string, masksPath?: string, onlyMissing = false, subdirs = false) =>
     apiFetch<DatasetInfo>("/api/dataset/load", {
       method: "POST",
       body: JSON.stringify({
-        path, masks_path: masksPath,
+        path,
+        masks_path: masksPath,
         only_missing_captions: onlyMissing,
         include_subdirectories: subdirs,
       }),
     }),
 
-  getItem: (index: number) =>
-    apiFetch<MediaItem>(`/api/dataset/item/${index}`),
+  getItem: (index: number) => apiFetch<MediaItem>(`/api/dataset/item/${index}`),
 
   getGallery: (page = 0, pageSize = 50) =>
     apiFetch<GalleryResponse>(`/api/dataset/gallery?page=${page}&page_size=${pageSize}`),
@@ -62,8 +120,11 @@ export const api = {
     apiFetch<{ total_items: number }>(`/api/dataset/item/${index}`, { method: "DELETE" }),
 
   renameItem: (index: number, newName: string) =>
-    apiFetch<MediaItem>(`/api/dataset/item/${index}/rename?new_name=${encodeURIComponent(newName)}`, { method: "PUT" }),
+    apiFetch<MediaItem>(`/api/dataset/item/${index}/rename?new_name=${encodeURIComponent(newName)}`, {
+      method: "PUT",
+    }),
 
+  // Captions
   saveCaption: (index: number, caption: string) =>
     apiFetch("/api/captions/save", {
       method: "PUT",
@@ -82,8 +143,7 @@ export const api = {
   prependTag: (tag: string) =>
     apiFetch("/api/captions/tags/prepend", { method: "POST", body: JSON.stringify({ tag }) }),
 
-  cleanupTags: () =>
-    apiFetch("/api/captions/tags/cleanup", { method: "POST" }),
+  cleanupTags: () => apiFetch("/api/captions/tags/cleanup", { method: "POST" }),
 
   replaceUnderscores: () =>
     apiFetch("/api/captions/tags/replace-underscores", { method: "POST" }),
@@ -109,12 +169,14 @@ export const api = {
       body: JSON.stringify({ tags, inverse, subdirectory_name: subdirectoryName }),
     }),
 
+  // Tagging
   generateCaption: (index: number, tagger: string) =>
     apiFetch<{ caption: string }>("/api/tagging/generate", {
       method: "POST",
       body: JSON.stringify({ index, tagger }),
     }),
 
+  // Processing
   upscale: (index: number, upscaler?: string, targetMp?: number) =>
     apiFetch("/api/processing/upscale", {
       method: "POST",
@@ -133,10 +195,8 @@ export const api = {
       body: JSON.stringify({ index }),
     }),
 
-  batchProcess: (options: {
-    rename?: boolean; upscale?: boolean; bucket_resize?: boolean;
-    mask?: boolean; caption?: boolean; tagger?: string;
-  }) => {
+  // Batch
+  batchProcess: (options: Record<string, unknown>) => {
     return getSessionId().then((sid) => {
       const params = new URLSearchParams();
       Object.entries(options).forEach(([k, v]) => {
@@ -153,20 +213,24 @@ export const api = {
       body: JSON.stringify({ resolution, step, max_steps: maxSteps }),
     }),
 
+  // Settings
   getSettings: () => apiFetch<Settings>("/api/settings/"),
   updateSetting: (key: string, value: unknown) =>
     apiFetch("/api/settings/", { method: "PUT", body: JSON.stringify({ key, value }) }),
   getUpscalers: () => apiFetch<Upscaler[]>("/api/settings/upscalers"),
   getTaggers: () => apiFetch<Tagger[]>("/api/settings/taggers"),
 
+  // Tools
   copyImages: (targetDir: string, option: string) =>
     apiFetch("/api/settings/tools/copy", {
       method: "POST",
       body: JSON.stringify({ target_directory: targetDir, copy_option: option }),
     }),
 
+  // Validation
   validate: () => apiFetch("/api/settings/validation"),
 
+  // Media URLs
   mediaUrl: getMediaUrl,
   thumbnailUrl: getThumbnailUrl,
 };
