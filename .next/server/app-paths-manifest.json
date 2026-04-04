@@ -1,0 +1,8 @@
+{
+  "/browse/page": "app/browse/page.js",
+  "/captions/page": "app/captions/page.js",
+  "/validation/page": "app/validation/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/tools/page": "app/tools/page.js",
+  "/batch/page": "app/batch/page.js"
+}
