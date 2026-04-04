@@ -93,3 +93,42 @@ export interface BucketResult {
   buckets: Array<{ width: number; height: number; count: number; images: string[] }>;
   total_images: number;
 }
+
+export interface Project {
+  session_id: string;
+  project_id: string;
+  project_name: string;
+  path: string;
+  total_items: number;
+  current_index: number;
+  created_at: number;
+  last_accessed: number;
+}
+
+export interface RecentProject {
+  project_id: string;
+  name: string;
+  path: string;
+  last_opened: string;
+  open_count: number;
+  is_active: boolean;
+}
+
+export interface ProjectOpenResponse {
+  session_id: string;
+  project_id: string;
+  project_name: string;
+  dataset_info: {
+    total_items: number;
+    base_dir: string;
+    masks_dir: string | null;
+  };
+}
+
+export interface ActiveProjectsResponse {
+  projects: Project[];
+}
+
+export interface RecentProjectsResponse {
+  projects: RecentProject[];
+}
