@@ -1,17 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import { FolderOpen } from "lucide-react";
+import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
+import EmptyState from "@/components/shared/EmptyState";
 import TagCloud from "@/components/captions/TagCloud";
 import TagOperations from "@/components/captions/TagOperations";
 import SearchReplace from "@/components/captions/SearchReplace";
 
 export default function CaptionsPage() {
-  const { datasetInfo } = useSessionStore();
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const session = activeProjectId
+    ? useSessionStore((s) => s.getProjectSession(activeProjectId))
+    : undefined;
+  const { datasetInfo } = session ?? {};
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  if (!activeProjectId) {
+    return (
+      <EmptyState
+        icon={FolderOpen}
+        title="No project open"
+        description="Open a project to manage captions and tags."
+      />
+    );
+  }
+
   if (!datasetInfo) {
-    return <div className="text-zinc-500 text-center py-12">Load a dataset to manage captions</div>;
+    return <div className="text-text-muted text-center py-12">Loading...</div>;
   }
 
   return (

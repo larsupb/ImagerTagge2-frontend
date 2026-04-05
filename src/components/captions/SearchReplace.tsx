@@ -4,6 +4,11 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { SearchReplacePreview } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SearchReplace() {
   const [search, setSearch] = useState("");
@@ -13,54 +18,66 @@ export default function SearchReplace() {
 
   const handlePreview = async () => {
     if (!search.trim()) return;
-    const result = await api.searchReplacePreview(search, replace);
-    setPreview(result);
+    try {
+      const result = await api.searchReplacePreview(search, replace);
+      setPreview(result);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to preview search & replace");
+    }
   };
 
   const handleApply = async () => {
     if (!search.trim()) return;
-    await api.searchReplaceApply(search, replace);
-    setPreview(null);
-    setSearch("");
-    setReplace("");
-    queryClient.invalidateQueries({ queryKey: ["tagCloud"] });
+    try {
+      await api.searchReplaceApply(search, replace);
+      toast.success("Search & replace applied successfully");
+      setPreview(null);
+      setSearch("");
+      setReplace("");
+      queryClient.invalidateQueries({ queryKey: ["tagCloud"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to apply search & replace");
+    }
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium">Search & Replace</h3>
+    <div className="bg-surface rounded-lg border border-border p-4 flex flex-col gap-3">
+      <h3 className="text-sm font-medium text-text">Search & Replace</h3>
       <div className="flex gap-2">
-        <input
+        <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search..."
-          className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-white"
+          className="flex-1 text-sm"
         />
-        <input
+        <Input
           value={replace}
           onChange={(e) => setReplace(e.target.value)}
           placeholder="Replace with..."
-          className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-white"
+          className="flex-1 text-sm"
         />
-        <button onClick={handlePreview} className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 rounded text-xs">
+        <Button variant="outline" size="sm" onClick={handlePreview} disabled={!search.trim()}>
           Preview
-        </button>
-        <button onClick={handleApply} disabled={!preview} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs disabled:opacity-50">
+        </Button>
+        <Button variant="default" size="sm" onClick={handleApply} disabled={!preview}>
           Apply
-        </button>
+        </Button>
       </div>
 
       {preview && (
-        <div className="max-h-48 overflow-y-auto bg-zinc-900 rounded border border-zinc-700 p-2 text-xs">
-          <p className="text-zinc-400 mb-1">{preview.total_matches} matches</p>
-          {preview.matches.slice(0, 20).map((m) => (
-            <div key={m.index} className="mb-1">
-              <span className="text-zinc-500">{m.filename}:</span>{" "}
-              <span className="text-red-400 line-through">{m.before.substring(0, 80)}</span>{" "}
-              → <span className="text-green-400">{m.after.substring(0, 80)}</span>
-            </div>
-          ))}
-        </div>
+        <ScrollArea className="h-48 rounded border border-border bg-surface-raised">
+          <div className="p-3">
+            <p className="text-text-muted text-xs mb-2">{preview.total_matches} matches</p>
+            {preview.matches.slice(0, 20).map((m) => (
+              <div key={m.index} className="mb-2 text-xs">
+                <span className="text-text-muted">{m.filename}: </span>
+                <span className="text-danger line-through">{m.before.substring(0, 80)}</span>
+                {" → "}
+                <span className="text-success">{m.after.substring(0, 80)}</span>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       )}
     </div>
   );
