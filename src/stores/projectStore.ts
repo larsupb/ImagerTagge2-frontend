@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Project, RecentProject, ProjectOpenResponse } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, setSessionId } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 
 interface ProjectStore {
@@ -31,6 +31,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   openProject: async (path, masksPath, onlyMissing, subdirs) => {
     const result = await api.openProject(path, masksPath, onlyMissing, subdirs);
     const sessionId = result.session_id;
+    setSessionId(sessionId);
     useSessionStore.getState().setDatasetInfo(sessionId, {
       total_items: result.dataset_info.total_items,
       base_dir: result.dataset_info.base_dir,
@@ -72,6 +73,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   switchProject: (sessionId) => {
+    setSessionId(sessionId);
     set({ activeProjectId: sessionId });
   },
 
@@ -87,7 +89,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
     set({ projects: response.projects });
     if (response.projects.length > 0) {
-      set({ activeProjectId: response.projects[0].session_id });
+      const first = response.projects[0].session_id;
+      set({ activeProjectId: first });
+      setSessionId(first);
     }
   },
 
