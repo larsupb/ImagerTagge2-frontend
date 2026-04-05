@@ -36,10 +36,10 @@ export default function EditPage() {
   );
 
   useEffect(() => {
-    if (activeProjectId && datasetInfo) {
+    if (activeProjectId && datasetInfo && !currentItem) {
       loadItem(currentIndex ?? 0);
     }
-  }, [activeProjectId, datasetInfo]);
+  }, [activeProjectId, datasetInfo, currentItem, currentIndex, loadItem]);
 
   useEffect(() => {
     if (!activeProjectId) return;
