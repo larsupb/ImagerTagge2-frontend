@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Project, RecentProject, ProjectOpenResponse } from "@/lib/types";
 import { api } from "@/lib/api";
+import { useSessionStore } from "@/stores/session";
 
 interface ProjectStore {
   projects: Project[];
@@ -29,11 +30,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   openProject: async (path, masksPath, onlyMissing, subdirs) => {
     const result = await api.openProject(path, masksPath, onlyMissing, subdirs);
+    const sessionId = result.session_id;
+    useSessionStore.getState().setDatasetInfo(sessionId, {
+      total_items: result.dataset_info.total_items,
+      base_dir: result.dataset_info.base_dir,
+      masks_dir: result.dataset_info.masks_dir,
+    });
     set((state) => ({
       projects: [
         ...state.projects,
         {
-          session_id: result.session_id,
+          session_id: sessionId,
           project_id: result.project_id,
           project_name: result.project_name,
           path: result.dataset_info.base_dir,
@@ -43,7 +50,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           last_accessed: Date.now() / 1000,
         },
       ],
-      activeProjectId: result.session_id,
+      activeProjectId: sessionId,
     }));
     return result;
   },
@@ -70,6 +77,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   loadActiveProjects: async () => {
     const response = await api.getActiveProjects();
+    const sessionStore = useSessionStore.getState();
+    for (const project of response.projects) {
+      sessionStore.setDatasetInfo(project.session_id, {
+        total_items: project.total_items,
+        base_dir: project.path,
+        masks_dir: null,
+      });
+    }
     set({ projects: response.projects });
     if (response.projects.length > 0) {
       set({ activeProjectId: response.projects[0].session_id });
