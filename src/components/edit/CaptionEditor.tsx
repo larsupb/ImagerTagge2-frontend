@@ -3,7 +3,14 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useSessionStore } from "@/stores/session";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CaptionEditorProps {
   caption: string;
@@ -42,42 +49,42 @@ export default function CaptionEditor({ caption, index, onCaptionChange }: Capti
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="bg-surface rounded-lg border border-border p-4 flex flex-col gap-3">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={4}
-        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm text-white resize-y focus:outline-none focus:border-blue-500"
+        className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-text resize-y focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 placeholder:text-text-muted"
         placeholder="Caption text..."
       />
 
       <div className="flex items-center gap-2">
-        <select
-          value={tagger}
-          onChange={(e) => setTagger(e.target.value)}
-          className="px-2 py-1.5 bg-zinc-800 border border-zinc-600 rounded text-sm text-white"
-        >
-          {taggers?.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+        <Select value={tagger} onValueChange={(value) => value && setTagger(value)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {taggers?.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <button
+        <Button
           onClick={handleGenerate}
           disabled={generating}
-          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded text-sm font-medium disabled:opacity-50"
         >
           {generating ? "Generating..." : "Generate"}
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
           onClick={handleSave}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium"
         >
           Save Caption
-        </button>
+        </Button>
       </div>
     </div>
   );

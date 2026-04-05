@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpCircle, Eraser, VenetianMask, Pencil, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
-import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 interface ImageToolbarProps {
   index: number;
@@ -11,11 +16,17 @@ interface ImageToolbarProps {
 }
 
 export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
-  const { currentItem, datasetInfo } = useSessionStore();
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const session = activeProjectId
+    ? useSessionStore((s) => s.getProjectSession(activeProjectId))
+    : null;
+  const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
   const [processing, setProcessing] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
+
+  const currentItem = session?.currentItem;
 
   const handleUpscale = async () => {
     setProcessing("upscale");
@@ -63,62 +74,85 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-zinc-400 mr-2">
+      <span className="text-xs text-text-muted mr-2">
         {currentItem?.filename}
-        {currentItem?.width && ` — ${currentItem.width}×${currentItem.height}`}
-        {currentItem?.file_size && ` — ${(currentItem.file_size / 1024).toFixed(0)}KB`}
+        {currentItem?.width && ` \u2014 ${currentItem.width}\u00d7${currentItem.height}`}
+        {currentItem?.file_size && ` \u2014 ${(currentItem.file_size / 1024).toFixed(0)}KB`}
       </span>
 
-      <button
-        onClick={handleUpscale}
-        disabled={!!processing}
-        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs disabled:opacity-50"
-      >
-        {processing === "upscale" ? "Upscaling..." : "Upscale"}
-      </button>
-      <button
-        onClick={handleRemoveBg}
-        disabled={!!processing}
-        className="px-3 py-1 bg-teal-600 hover:bg-teal-700 rounded text-xs disabled:opacity-50"
-      >
-        {processing === "rembg" ? "Removing..." : "Remove BG"}
-      </button>
-      <button
-        onClick={handleGenerateMask}
-        disabled={!!processing}
-        className="px-3 py-1 bg-orange-600 hover:bg-orange-700 rounded text-xs disabled:opacity-50"
-      >
-        {processing === "mask" ? "Generating..." : "Gen Mask"}
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={handleUpscale}
+          disabled={!!processing}
+        >
+          <ArrowUpCircle className="size-4 text-purple-500" />
+        </TooltipTrigger>
+        <TooltipContent>
+          {processing === "upscale" ? "Upscaling..." : "Upscale"}
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={handleRemoveBg}
+          disabled={!!processing}
+        >
+          <Eraser className="size-4 text-teal-500" />
+        </TooltipTrigger>
+        <TooltipContent>
+          {processing === "rembg" ? "Removing..." : "Remove BG"}
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={handleGenerateMask}
+          disabled={!!processing}
+        >
+          <VenetianMask className="size-4 text-orange-500" />
+        </TooltipTrigger>
+        <TooltipContent>
+          {processing === "mask" ? "Generating..." : "Gen Mask"}
+        </TooltipContent>
+      </Tooltip>
 
       <div className="flex-1" />
 
       {renaming ? (
-        <div className="flex gap-1">
-          <input
+        <div className="flex gap-1 items-center">
+          <Input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="w-32 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-white"
+            className="w-32 h-7 text-xs"
             placeholder="New name"
           />
-          <button onClick={handleRename} className="px-2 py-1 bg-blue-600 rounded text-xs">OK</button>
-          <button onClick={() => setRenaming(false)} className="px-2 py-1 bg-zinc-700 rounded text-xs">Cancel</button>
+          <Button size="xs" onClick={handleRename}>OK</Button>
+          <Button size="xs" variant="secondary" onClick={() => setRenaming(false)}>Cancel</Button>
         </div>
       ) : (
-        <button
-          onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}
-          className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 rounded text-xs"
-        >
-          Rename
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}
+          >
+            <Pencil className="size-4" />
+          </TooltipTrigger>
+          <TooltipContent>Rename</TooltipContent>
+        </Tooltip>
       )}
 
-      <button
-        onClick={() => setConfirmDelete(true)}
-        className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs"
-      >
-        Delete
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 className="size-4" />
+        </TooltipTrigger>
+        <TooltipContent>Delete</TooltipContent>
+      </Tooltip>
 
       <ConfirmDialog
         open={confirmDelete}
