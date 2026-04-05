@@ -1,3 +1,5 @@
+"use client";
+
 import GalleryGrid from "@/components/browse/GalleryGrid";
 import EmptyState from "@/components/shared/EmptyState";
 import { useProjectStore } from "@/stores/projectStore";
