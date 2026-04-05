@@ -33,22 +33,6 @@ export default function ProjectTabs() {
     }
   };
 
-  if (projects.length === 0) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-surface">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => setShowOpenDialog(!showOpenDialog)}
-        >
-          <FolderOpen className="w-4 h-4" />
-          Open Project
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col border-b border-border bg-surface">
       <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto">
@@ -83,6 +67,17 @@ export default function ProjectTabs() {
         >
           <Plus className="w-4 h-4" />
         </Button>
+        {projects.length === 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 ml-2"
+            onClick={() => setShowOpenDialog(!showOpenDialog)}
+          >
+            <FolderOpen className="w-4 h-4" />
+            Open Project
+          </Button>
+        )}
       </div>
       {showOpenDialog && (
         <div className="flex items-center gap-2 px-2 pb-2">
