@@ -2,39 +2,49 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  Image,
+  Pencil,
+  Tags,
+  Layers,
+  Wrench,
+  CheckCircle,
+  Settings,
+} from "lucide-react";
 
 const navItems = [
-  { href: "/browse", label: "Browse", icon: "🖼" },
-  { href: "/edit", label: "Edit", icon: "✏" },
-  { href: "/captions", label: "Captions", icon: "💬" },
-  { href: "/batch", label: "Batch", icon: "⚙" },
-  { href: "/tools", label: "Tools", icon: "🔧" },
-  { href: "/validation", label: "Validation", icon: "✓" },
-  { href: "/settings", label: "Settings", icon: "⚡" },
+  { href: "/browse", label: "Browse", icon: Image },
+  { href: "/edit", label: "Edit", icon: Pencil },
+  { href: "/captions", label: "Captions", icon: Tags },
+  { href: "/batch", label: "Batch", icon: Layers },
+  { href: "/tools", label: "Tools", icon: Wrench },
+  { href: "/validation", label: "Validation", icon: CheckCircle },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <nav className="w-48 shrink-0 border-r border-zinc-700 bg-zinc-900 flex flex-col">
-      <div className="p-4 border-b border-zinc-700">
-        <h1 className="text-lg font-bold text-white">ImageTagger</h1>
+    <nav className="w-60 shrink-0 border-r border-border bg-surface flex flex-col">
+      <div className="p-4 border-b border-border">
+        <h1 className="text-lg font-bold text-text">ImageTagger</h1>
       </div>
       <ul className="flex-1 py-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const Icon = item.icon;
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   isActive
-                    ? "bg-zinc-700 text-white font-medium"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-text-secondary hover:text-text hover:bg-surface-raised"
                 }`}
               >
-                <span>{item.icon}</span>
+                <Icon className="w-4 h-4" />
                 {item.label}
               </Link>
             </li>
