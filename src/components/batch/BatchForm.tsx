@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getCurrentSessionId } from "@/lib/api";
 import type { BatchProgress, BucketResult, Upscaler, Tagger } from "@/lib/types";
 import ProgressLog from "./ProgressLog";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,7 @@ export default function BatchForm() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Session-ID": getCurrentSessionId() || "",
         },
         body: JSON.stringify({
           rename,
@@ -126,7 +127,11 @@ export default function BatchForm() {
       });
 
       if (!response.ok) {
-        toast.error("Batch processing failed");
+        const error = await response.json().catch(() => null);
+        const detail = error?.detail
+          ? JSON.stringify(error.detail)
+          : `Batch processing failed (${response.status})`;
+        toast.error(detail);
         return;
       }
 
