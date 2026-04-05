@@ -2,10 +2,54 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useProjectStore } from "@/stores/projectStore";
 import { api } from "@/lib/api";
-import type { Settings, Upscaler, Tagger } from "@/lib/types";
+import type { Settings, Tagger, Upscaler } from "@/lib/types";
+import EmptyState from "@/components/shared/EmptyState";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="bg-surface rounded-lg border border-border">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-6 text-left hover:bg-surface-raised transition-colors rounded-lg"
+      >
+        <h3 className="text-base font-medium text-text">{title}</h3>
+        {isOpen ? (
+          <ChevronDown className="w-4 h-4 text-text-secondary" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-text-secondary" />
+        )}
+      </button>
+      {isOpen && <div className="px-6 pb-6 flex flex-col gap-4">{children}</div>}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const queryClient = useQueryClient();
   const { data: settings, isLoading, error } = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
   const { data: upscalers } = useQuery({ queryKey: ["upscalers"], queryFn: () => api.getUpscalers() });
@@ -17,183 +61,248 @@ export default function SettingsPage() {
     if (settings) setLocalSettings(settings);
   }, [settings]);
 
+  if (!activeProjectId) {
+    return (
+      <EmptyState
+        icon={FolderOpen}
+        title="No project open"
+        description="Open a project to view settings."
+      />
+    );
+  }
+
   if (isLoading) {
-    return <div className="text-zinc-500">Loading settings...</div>;
+    return <div className="text-text-muted text-center py-12">Loading settings...</div>;
   }
 
   if (error) {
-    return <div className="text-red-400">Error loading settings: {error instanceof Error ? error.message : "Unknown error"}</div>;
+    return (
+      <div className="text-destructive text-center py-12">
+        Error loading settings: {error instanceof Error ? error.message : "Unknown error"}
+      </div>
+    );
   }
 
   if (!localSettings) {
-    return <div className="text-zinc-500">No settings available</div>;
+    return <div className="text-text-muted text-center py-12">No settings available</div>;
   }
 
   const save = async (key: string, value: unknown) => {
-    await api.updateSetting(key, value);
-    queryClient.invalidateQueries({ queryKey: ["settings"] });
+    try {
+      await api.updateSetting(key, value);
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      toast.success("Setting saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save setting");
+    }
   };
 
   return (
     <div className="max-w-2xl flex flex-col gap-6">
-      <h2 className="text-lg font-medium">Settings</h2>
-
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Upscaler</label>
-        <select
-          value={localSettings.upscaler}
-          onChange={(e) => { setLocalSettings({ ...localSettings, upscaler: e.target.value }); save("upscaler", e.target.value); }}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm"
-        >
-          {upscalers?.map((u) => (
-            <option key={u.name} value={u.name}>{u.name} ({u.scale_factor}x)</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Upscale Target (megapixels)</label>
-        <input
-          type="number"
-          step="0.5"
-          value={localSettings.upscale_target_megapixels}
-          onChange={(e) => { const v = Number(e.target.value); setLocalSettings({ ...localSettings, upscale_target_megapixels: v }); save("upscale_target_megapixels", v); }}
-          className="w-32 px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Combo Taggers</label>
-        <div className="flex gap-3">
-          {taggers?.filter((t) => t.id !== "combo").map((t) => (
-            <label key={t.id} className="flex items-center gap-1 text-sm">
-              <input
-                type="checkbox"
-                checked={localSettings.combo_taggers.includes(t.id)}
-                onChange={(e) => {
-                  const next = e.target.checked
-                    ? [...localSettings.combo_taggers, t.id]
-                    : localSettings.combo_taggers.filter((x) => x !== t.id);
-                  setLocalSettings({ ...localSettings, combo_taggers: next });
-                  save("combo_taggers", next);
-                }}
-              />
-              {t.name}
-            </label>
-          ))}
+      <Section title="Upscaling" defaultOpen>
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Upscaler</label>
+          <Select
+            value={localSettings.upscaler || undefined}
+            onValueChange={(v) => {
+              if (v) {
+                setLocalSettings({ ...localSettings, upscaler: v });
+                save("upscaler", v);
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {upscalers?.map((u) => (
+                <SelectItem key={u.name} value={u.name}>
+                  {u.name} ({u.scale_factor}x)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Florence Prompt</label>
-        <select
-          value={localSettings.florence_settings.prompt}
-          onChange={(e) => {
-            const next = { prompt: e.target.value };
-            setLocalSettings({ ...localSettings, florence_settings: next });
-            save("florence_settings", next);
-          }}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm"
-        >
-          <option value="<GENERATE_PROMPT>">Generate Prompt</option>
-          <option value="<DETAILED_CAPTION>">Detailed Caption</option>
-          <option value="<MORE_DETAILED_CAPTION>">More Detailed Caption</option>
-        </select>
-      </div>
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">
+            Upscale Target (megapixels)
+          </label>
+          <Input
+            type="number"
+            step="0.5"
+            value={localSettings.upscale_target_megapixels}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setLocalSettings({ ...localSettings, upscale_target_megapixels: v });
+              save("upscale_target_megapixels", v);
+            }}
+            className="w-32"
+          />
+        </div>
+      </Section>
 
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Tagger Instruction</label>
-        <textarea
-          value={localSettings.tagger_instruction}
-          onChange={(e) => setLocalSettings({ ...localSettings, tagger_instruction: e.target.value })}
-          onBlur={() => save("tagger_instruction", localSettings.tagger_instruction)}
-          rows={3}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm resize-y"
-        />
-      </div>
+      <Section title="Taggers">
+        <div>
+          <label className="block text-sm text-text-secondary mb-2">Combo Taggers</label>
+          <div className="flex flex-wrap gap-4">
+            {taggers?.filter((t) => t.id !== "combo").map((t) => (
+              <label key={t.id} className="flex items-center gap-2 text-sm text-text">
+                <Checkbox
+                  checked={localSettings.combo_taggers.includes(t.id)}
+                  onCheckedChange={(checked) => {
+                    const next = checked
+                      ? [...localSettings.combo_taggers, t.id]
+                      : localSettings.combo_taggers.filter((x) => x !== t.id);
+                    setLocalSettings({ ...localSettings, combo_taggers: next });
+                    save("combo_taggers", next);
+                  }}
+                />
+                {t.name}
+              </label>
+            ))}
+          </div>
+        </div>
 
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Background Removal Model</label>
-        <select
-          value={localSettings.rembg.model}
-          onChange={(e) => {
-            const next = { model: e.target.value };
-            setLocalSettings({ ...localSettings, rembg: next });
-            save("rembg", next);
-          }}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm"
-        >
-          <option value="u2net_human_seg">u2net_human_seg</option>
-          <option value="u2net">u2net</option>
-          <option value="u2net_cloth_seg">u2net_cloth_seg</option>
-        </select>
-      </div>
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">
+            Tagger Instruction
+          </label>
+          <textarea
+            value={localSettings.tagger_instruction}
+            onChange={(e) =>
+              setLocalSettings({ ...localSettings, tagger_instruction: e.target.value })
+            }
+            onBlur={() => save("tagger_instruction", localSettings.tagger_instruction)}
+            rows={3}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text resize-y focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+          />
+        </div>
+      </Section>
 
-      <div className="border border-zinc-700 rounded p-4">
-        <h3 className="text-sm font-medium mb-3">OpenAI-Compatible API</h3>
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Base URL</label>
-            <input
-              value={localSettings.openai_settings.base_url}
-              onChange={(e) => setLocalSettings({
+      <Section title="Florence">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Florence Prompt</label>
+          <Select
+            value={localSettings.florence_settings.prompt || undefined}
+            onValueChange={(v) => {
+              if (v) {
+                const next = { prompt: v };
+                setLocalSettings({ ...localSettings, florence_settings: next });
+                save("florence_settings", next);
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="<GENERATE_PROMPT>">Generate Prompt</SelectItem>
+              <SelectItem value="<DETAILED_CAPTION>">Detailed Caption</SelectItem>
+              <SelectItem value="<MORE_DETAILED_CAPTION>">More Detailed Caption</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Section>
+
+      <Section title="Background Removal">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Model</label>
+          <Select
+            value={localSettings.rembg.model || undefined}
+            onValueChange={(v) => {
+              if (v) {
+                const next = { model: v };
+                setLocalSettings({ ...localSettings, rembg: next });
+                save("rembg", next);
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="u2net_human_seg">u2net_human_seg</SelectItem>
+              <SelectItem value="u2net">u2net</SelectItem>
+              <SelectItem value="u2net_cloth_seg">u2net_cloth_seg</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Section>
+
+      <Section title="OpenAI-Compatible API">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Base URL</label>
+          <Input
+            value={localSettings.openai_settings.base_url}
+            onChange={(e) =>
+              setLocalSettings({
                 ...localSettings,
                 openai_settings: { ...localSettings.openai_settings, base_url: e.target.value },
-              })}
-              onBlur={() => save("openai_settings", localSettings.openai_settings)}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-600 rounded text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Model</label>
-            <input
-              value={localSettings.openai_settings.model}
-              onChange={(e) => setLocalSettings({
+              })
+            }
+            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Model</label>
+          <Input
+            value={localSettings.openai_settings.model}
+            onChange={(e) =>
+              setLocalSettings({
                 ...localSettings,
                 openai_settings: { ...localSettings.openai_settings, model: e.target.value },
-              })}
-              onBlur={() => save("openai_settings", localSettings.openai_settings)}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-600 rounded text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">API Key</label>
-            <input
-              type="password"
-              value={localSettings.openai_settings.api_key}
-              onChange={(e) => setLocalSettings({
+              })
+            }
+            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">API Key</label>
+          <Input
+            type="password"
+            value={localSettings.openai_settings.api_key}
+            onChange={(e) =>
+              setLocalSettings({
                 ...localSettings,
                 openai_settings: { ...localSettings.openai_settings, api_key: e.target.value },
-              })}
-              onBlur={() => save("openai_settings", localSettings.openai_settings)}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-600 rounded text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Prompt</label>
-            <textarea
-              value={localSettings.openai_settings.prompt}
-              onChange={(e) => setLocalSettings({
+              })
+            }
+            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Prompt</label>
+          <textarea
+            value={localSettings.openai_settings.prompt}
+            onChange={(e) =>
+              setLocalSettings({
                 ...localSettings,
                 openai_settings: { ...localSettings.openai_settings, prompt: e.target.value },
-              })}
-              onBlur={() => save("openai_settings", localSettings.openai_settings)}
-              rows={2}
-              className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-600 rounded text-sm resize-y"
-            />
-          </div>
+              })
+            }
+            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+            rows={2}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text resize-y focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+          />
         </div>
-      </div>
+      </Section>
 
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Models Directory</label>
-        <input
-          value={localSettings.models_dir}
-          onChange={(e) => setLocalSettings({ ...localSettings, models_dir: e.target.value })}
-          onBlur={() => save("models_dir", localSettings.models_dir)}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm"
-        />
-      </div>
+      <Section title="Paths">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Models Directory</label>
+          <Input
+            value={localSettings.models_dir}
+            onChange={(e) =>
+              setLocalSettings({ ...localSettings, models_dir: e.target.value })
+            }
+            onBlur={() => save("models_dir", localSettings.models_dir)}
+          />
+        </div>
+      </Section>
     </div>
   );
 }
