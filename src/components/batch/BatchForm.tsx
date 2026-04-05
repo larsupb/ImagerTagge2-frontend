@@ -5,6 +5,68 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { BatchProgress, BucketResult, Upscaler, Tagger } from "@/lib/types";
 import ProgressLog from "./ProgressLog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import {
+  Type,
+  ImagePlus,
+  Grid3X3,
+  Layers,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  BarChart3,
+} from "lucide-react";
+
+interface OperationCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  children?: React.ReactNode;
+}
+
+function OperationCard({ icon, title, description, checked, onCheckedChange, children }: OperationCardProps) {
+  const [expanded, setExpanded] = useState(checked);
+
+  const handleCheckedChange = (c: boolean) => {
+    onCheckedChange(c);
+    if (c) setExpanded(true);
+  };
+
+  return (
+    <div className={`bg-surface rounded-lg border border-border p-4 transition-colors hover:border-border/80 ${checked ? "border-primary/30" : ""}`}>
+      <div className="flex items-start gap-3">
+        <Checkbox checked={checked} onCheckedChange={handleCheckedChange} className="mt-0.5" />
+        <div className="flex flex-1 items-start gap-3">
+          <div className="text-text-muted">{icon}</div>
+          <div className="flex-1">
+            <label className="text-sm font-medium cursor-pointer" onClick={() => setExpanded(!expanded)}>
+              {title}
+            </label>
+            <p className="text-xs text-text-muted mt-0.5">{description}</p>
+          </div>
+          {checked && children && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-text-muted hover:text-text transition-colors"
+            >
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
+      </div>
+      {checked && expanded && children && (
+        <div className="mt-4 pt-4 border-t border-border">{children}</div>
+      )}
+    </div>
+  );
+}
 
 export default function BatchForm() {
   const [rename, setRename] = useState(false);
@@ -63,6 +125,11 @@ export default function BatchForm() {
         }),
       });
 
+      if (!response.ok) {
+        toast.error("Batch processing failed");
+        return;
+      }
+
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (reader) {
@@ -83,172 +150,196 @@ export default function BatchForm() {
           }
         }
       }
+      toast.success("Batch processing completed");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Batch processing failed");
     } finally {
       setIsRunning(false);
     }
   };
 
   const handleAnalyzeBuckets = async () => {
-    const result = await api.analyzeBuckets(resolution, step, maxSteps);
-    setBucketResult(result);
+    try {
+      const result = await api.analyzeBuckets(resolution, step, maxSteps);
+      setBucketResult(result);
+      toast.success("Bucket analysis complete");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bucket analysis failed");
+    }
   };
 
+  const hasAnyOperation = rename || upscale || bucketResize || mask || caption;
+
   return (
-    <div className="flex flex-col gap-4 max-w-3xl">
-      <h2 className="text-lg font-medium">Batch Processing</h2>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={rename} onChange={(e) => setRename(e.target.checked)} />
-            Rename (5 digits)
-          </label>
-          {rename && (
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Offset</label>
-              <input
-                type="number"
-                value={renameOffset}
-                onChange={(e) => setRenameOffset(Number(e.target.value))}
-                min={0}
-                max={99999}
-                className="w-24 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={upscale} onChange={(e) => setUpscale(e.target.checked)} />
-            Upscale
-          </label>
-          {upscale && (
-            <select
-              value={batchUpscaler}
-              onChange={(e) => setBatchUpscaler(e.target.value)}
-              className="w-full px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-sm"
-            >
-              <option value="">Default</option>
-              {upscalers?.map((u) => (
-                <option key={u.name} value={u.name}>
-                  {u.name} ({u.scale_factor}x)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={bucketResize} onChange={(e) => setBucketResize(e.target.checked)} />
-            Bucket Resize
-          </label>
-          {bucketResize && (
-            <div className="flex gap-2">
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Base Res</label>
-                <select
-                  value={resolution}
-                  onChange={(e) => setResolution(Number(e.target.value))}
-                  className="w-20 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm"
-                >
-                  {[512, 768, 1024, 1280, 1536, 1792, 2048].map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Step</label>
-                <input
-                  type="number"
-                  value={step}
-                  onChange={(e) => setStep(Number(e.target.value))}
-                  min={64}
-                  max={512}
-                  step={64}
-                  className="w-20 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Max Steps</label>
-                <input
-                  type="number"
-                  value={maxSteps}
-                  onChange={(e) => setMaxSteps(Number(e.target.value))}
-                  min={1}
-                  max={4}
-                  className="w-16 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={mask} onChange={(e) => setMask(e.target.checked)} />
-            Generate Masks
-          </label>
-        </div>
+    <div className="flex flex-col gap-6 max-w-3xl">
+      <div>
+        <h2 className="text-lg font-medium text-text">Batch Processing</h2>
+        <p className="text-sm text-text-muted mt-1">Select operations to run on all images in the dataset.</p>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={caption} onChange={(e) => setCaption(e.target.checked)} />
-          Generate Captions
-        </label>
-        {caption && (
-          <div className="flex flex-col gap-2 ml-6">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-zinc-400">Method:</label>
-              <select
-                value={tagger}
-                onChange={(e) => setTagger(e.target.value)}
-                className="px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-sm"
-              >
-                {taggers?.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+      <div className="grid grid-cols-1 gap-3">
+        <OperationCard
+          icon={<Type className="w-5 h-5" />}
+          title="Rename Files"
+          description="Rename files using a 5-digit sequential pattern."
+          checked={rename}
+          onCheckedChange={setRename}
+        >
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-text-secondary">Offset</label>
+            <Input
+              type="number"
+              value={renameOffset}
+              onChange={(e) => setRenameOffset(Number(e.target.value))}
+              min={0}
+              max={99999}
+              className="w-24"
+            />
+          </div>
+        </OperationCard>
+
+        <OperationCard
+          icon={<ImagePlus className="w-5 h-5" />}
+          title="Upscale"
+          description="Upscale images using a selected upscaler model."
+          checked={upscale}
+          onCheckedChange={setUpscale}
+        >
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-text-secondary">Upscaler</label>
+            <Select value={batchUpscaler} onValueChange={(v) => setBatchUpscaler(v ?? "")}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Default</SelectItem>
+                {upscalers?.map((u: Upscaler) => (
+                  <SelectItem key={u.name} value={u.name}>
+                    {u.name} ({u.scale_factor}x)
+                  </SelectItem>
                 ))}
-                <option value="unified">Unified</option>
-              </select>
+              </SelectContent>
+            </Select>
+          </div>
+        </OperationCard>
+
+        <OperationCard
+          icon={<Grid3X3 className="w-5 h-5" />}
+          title="Bucket Resize"
+          description="Resize images to optimal bucket dimensions for training."
+          checked={bucketResize}
+          onCheckedChange={setBucketResize}
+        >
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-text-secondary">Base Res</label>
+              <Select value={String(resolution)} onValueChange={(v) => setResolution(Number(v))}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[512, 768, 1024, 1280, 1536, 1792, 2048].map((r) => (
+                    <SelectItem key={r} value={String(r)}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-text-secondary">Step</label>
+              <Input
+                type="number"
+                value={step}
+                onChange={(e) => setStep(Number(e.target.value))}
+                min={64}
+                max={512}
+                step={64}
+                className="w-20"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-text-secondary">Max Steps</label>
+              <Input
+                type="number"
+                value={maxSteps}
+                onChange={(e) => setMaxSteps(Number(e.target.value))}
+                min={1}
+                max={4}
+                className="w-16"
+              />
+            </div>
+          </div>
+        </OperationCard>
+
+        <OperationCard
+          icon={<Layers className="w-5 h-5" />}
+          title="Generate Masks"
+          description="Generate segmentation masks for all images."
+          checked={mask}
+          onCheckedChange={setMask}
+        />
+
+        <OperationCard
+          icon={<FileText className="w-5 h-5" />}
+          title="Generate Captions"
+          description="Auto-generate captions using a tagging model."
+          checked={caption}
+          onCheckedChange={setCaption}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-text-secondary">Method</label>
+              <Select value={tagger} onValueChange={(v) => setTagger(v ?? "joytag")}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {taggers?.map((t: Tagger) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                  <SelectItem value="unified">Unified</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {tagger === "unified" && (
-              <input
+              <Input
                 value={unifiedCaption}
                 onChange={(e) => setUnifiedCaption(e.target.value)}
                 placeholder="Enter unified caption..."
-                className="px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm text-white"
               />
             )}
           </div>
-        )}
+        </OperationCard>
       </div>
 
-      <div className="flex gap-2">
-        <button
+      <div className="flex gap-3 pt-2">
+        <Button
+          variant="outline"
           onClick={handleAnalyzeBuckets}
-          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded text-sm"
+          disabled={isRunning}
         >
+          <BarChart3 className="w-4 h-4 mr-1.5" />
           Analyze Buckets
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleStart}
-          disabled={isRunning || (!rename && !upscale && !bucketResize && !mask && !caption)}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium disabled:opacity-50"
+          disabled={isRunning || !hasAnyOperation}
+          className="ml-auto"
         >
-          {isRunning ? "Processing..." : "Start Batch"}
-        </button>
+          <Play className="w-4 h-4 mr-1.5" />
+          {isRunning ? "Processing..." : "Run Batch"}
+        </Button>
       </div>
 
       <ProgressLog entries={logEntries} isRunning={isRunning} />
 
       {bucketResult && (
-        <div className="bg-zinc-900 rounded border border-zinc-700 p-3">
-          <h3 className="text-sm font-medium mb-2">Bucket Analysis ({bucketResult.total_images} images)</h3>
-          <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="bg-surface rounded-lg border border-border p-4">
+          <h3 className="text-sm font-medium text-text mb-3">
+            Bucket Analysis ({bucketResult.total_images} images)
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
             {bucketResult.buckets.map((b, i) => (
-              <div key={i} className="bg-zinc-800 rounded p-2">
+              <div key={i} className="bg-surface-raised rounded border border-border p-2 text-xs text-text-secondary">
                 {b.width}×{b.height}: {b.count} images
               </div>
             ))}
