@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 interface CaptionEditorProps {
   caption: string;
@@ -76,6 +77,7 @@ export default function CaptionEditor({ caption, index, onCaptionChange }: Capti
           onClick={handleGenerate}
           disabled={generating}
         >
+          {generating && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
           {generating ? "Generating..." : "Generate"}
         </Button>
 
