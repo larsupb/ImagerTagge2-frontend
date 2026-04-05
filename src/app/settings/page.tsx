@@ -53,7 +53,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { data: settings, isLoading, error } = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
   const { data: upscalers } = useQuery({ queryKey: ["upscalers"], queryFn: () => api.getUpscalers() });
-  const { data: taggers } = useQuery({ queryKey: ["taggers"], queryFn: () => api.getTaggers() });
+  const { data: taggersResponse } = useQuery({ queryKey: ["taggers"], queryFn: () => api.getTaggers() });
 
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
 
@@ -144,9 +144,26 @@ export default function SettingsPage() {
 
       <Section title="Taggers">
         <div>
+          <label className="block text-sm text-text-secondary mb-2">Default Tagger</label>
+          <select
+            value={localSettings?.default_tagger ?? "florence"}
+            onChange={(e) => {
+              save("default_tagger", e.target.value);
+            }}
+            className="w-48 px-3 py-1.5 bg-background border border-border rounded text-sm text-text focus:outline-none focus:border-ring"
+          >
+            {taggersResponse?.taggers.map((t: Tagger) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
           <label className="block text-sm text-text-secondary mb-2">Combo Taggers</label>
           <div className="flex flex-wrap gap-4">
-            {taggers?.filter((t) => t.id !== "combo").map((t) => (
+            {taggersResponse?.taggers.filter((t: Tagger) => t.id !== "combo").map((t: Tagger) => (
               <label key={t.id} className="flex items-center gap-2 text-sm text-text">
                 <Checkbox
                   checked={localSettings.combo_taggers.includes(t.id)}

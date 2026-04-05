@@ -3,19 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Star } from "lucide-react";
+import { Star, AlertTriangle } from "lucide-react";
 import { api, getThumbnailUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GalleryItem } from "@/lib/types";
+
+function getIssues(item: GalleryItem): string[] {
+  const issues: string[] = [];
+  if (!item.has_caption) issues.push("No caption");
+  if (item.width && item.height && item.width * item.height < 1_000_000) {
+    issues.push(`Too small (${item.width}×${item.height}, <1 MP)`);
+  }
+  return issues;
+}
 
 export default function GalleryGrid() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const session = activeProjectId
-    ? useSessionStore.getState().getProjectSession(activeProjectId)
-    : null;
+  const session = useSessionStore((s) =>
+    activeProjectId ? s.getProjectSession(activeProjectId) : null
+  );
   const router = useRouter();
   const [page, setPage] = useState(0);
   const pageSize = 60;
@@ -79,28 +89,65 @@ export default function GalleryGrid() {
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-          {data?.items.map((item) => (
-            <button
-              key={item.index}
-              onClick={() => handleClick(item)}
-              className="group relative aspect-square rounded-lg border border-border bg-surface-raised overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200"
-            >
-              <img
-                src={getThumbnailUrl(item.index)}
-                alt={item.filename}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-              {item.is_bookmarked && (
-                <span className="absolute top-1.5 right-1.5 text-yellow-400">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                </span>
-              )}
-              <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-zinc-300 truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                {item.filename}
+          {data?.items.map((item) => {
+            const issues = getIssues(item);
+            const hasIssues = issues.length > 0;
+            const thumbnail = (
+              <div
+                key={item.index}
+                className={`group relative aspect-square rounded-lg border overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised ${
+                  hasIssues ? "border-danger" : "border-border"
+                }`}
+              >
+                <img
+                  src={getThumbnailUrl(item.index)}
+                  alt={item.filename}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                {item.is_bookmarked && (
+                  <span className="absolute top-1.5 right-1.5 text-yellow-400">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                  </span>
+                )}
+                {hasIssues && (
+                  <span className="absolute top-1.5 left-1.5 text-danger">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-zinc-300 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                  {item.filename}
+                </div>
               </div>
-            </button>
-          ))}
+            );
+
+            return (
+              <Tooltip key={item.index}>
+                <TooltipTrigger>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleClick(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") handleClick(item);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {thumbnail}
+                  </div>
+                </TooltipTrigger>
+                {hasIssues && (
+                  <TooltipContent>
+                    <ul className="text-xs">
+                      {issues.map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            );
+          })}
         </div>
       )}
     </div>

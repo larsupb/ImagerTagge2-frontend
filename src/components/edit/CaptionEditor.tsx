@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import type { Tagger } from "@/lib/types";
 import {
   Select,
   SelectContent,
@@ -16,22 +17,49 @@ import { Loader2 } from "lucide-react";
 interface CaptionEditorProps {
   caption: string;
   index: number;
+  savedCaption: string;
   onCaptionChange: (caption: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  getUnsavedText?: (getter: () => string) => void;
 }
 
-export default function CaptionEditor({ caption, index, onCaptionChange }: CaptionEditorProps) {
+export default function CaptionEditor({
+  caption,
+  index,
+  savedCaption,
+  onCaptionChange,
+  onDirtyChange,
+  getUnsavedText,
+}: CaptionEditorProps) {
   const [text, setText] = useState(caption);
-  const [tagger, setTagger] = useState("florence");
+  const [tagger, setTagger] = useState("");
   const [generating, setGenerating] = useState(false);
 
-  const { data: taggers } = useQuery({
+  const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
     queryFn: () => api.getTaggers(),
   });
 
   useEffect(() => {
+    if (taggersResponse?.default_tagger && !tagger) {
+      setTagger(taggersResponse.default_tagger);
+    }
+  }, [taggersResponse?.default_tagger, tagger]);
+
+  useEffect(() => {
     setText(caption);
   }, [caption]);
+
+  useEffect(() => {
+    const dirty = text !== savedCaption;
+    onDirtyChange?.(dirty);
+  }, [text, savedCaption, onDirtyChange]);
+
+  useEffect(() => {
+    if (getUnsavedText) {
+      getUnsavedText(() => text);
+    }
+  }, [getUnsavedText, text]);
 
   const handleSave = async () => {
     await api.saveCaption(index, text);
@@ -43,11 +71,12 @@ export default function CaptionEditor({ caption, index, onCaptionChange }: Capti
     try {
       const result = await api.generateCaption(index, tagger);
       setText(result.caption);
-      onCaptionChange(result.caption);
     } finally {
       setGenerating(false);
     }
   };
+
+  const dirty = text !== savedCaption;
 
   return (
     <div className="bg-surface rounded-lg border border-border p-4 flex flex-col gap-3">
@@ -65,7 +94,7 @@ export default function CaptionEditor({ caption, index, onCaptionChange }: Capti
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {taggers?.map((t) => (
+            {taggersResponse?.taggers.map((t: Tagger) => (
               <SelectItem key={t.id} value={t.id}>
                 {t.name}
               </SelectItem>
@@ -82,10 +111,12 @@ export default function CaptionEditor({ caption, index, onCaptionChange }: Capti
         </Button>
 
         <Button
-          variant="secondary"
+          variant={dirty ? "default" : "secondary"}
           onClick={handleSave}
+          className={dirty ? "bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg shadow-orange-500/40 ring-2 ring-orange-400/50" : ""}
         >
           Save Caption
+          {dirty && <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-white/20 rounded-full">*</span>}
         </Button>
       </div>
     </div>

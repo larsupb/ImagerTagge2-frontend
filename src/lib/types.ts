@@ -27,6 +27,9 @@ export interface GalleryItem {
   thumbnail_url: string;
   filename: string;
   is_bookmarked: boolean;
+  has_caption: boolean;
+  width: number | null;
+  height: number | null;
 }
 
 export interface GalleryResponse {
@@ -64,6 +67,7 @@ export interface Settings {
   ignore_list: string[];
   upscaler: string;
   upscale_target_megapixels: number;
+  default_tagger: string;
   tagger_instruction: string;
   combo_taggers: string[];
   florence_settings: { prompt: string };
@@ -80,6 +84,11 @@ export interface Tagger {
   id: string;
   name: string;
   description: string;
+}
+
+export interface TaggersResponse {
+  taggers: Tagger[];
+  default_tagger: string;
 }
 
 export interface Upscaler {

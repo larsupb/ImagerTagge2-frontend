@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { FolderOpen } from "lucide-react";
 import { api, getMediaUrl } from "@/lib/api";
 import { useProjectStore } from "@/stores/projectStore";
@@ -11,6 +11,15 @@ import VideoPlayer from "@/components/edit/VideoPlayer";
 import NavigationBar from "@/components/edit/NavigationBar";
 import CaptionEditor from "@/components/edit/CaptionEditor";
 import ImageToolbar from "@/components/edit/ImageToolbar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function EditPage() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
@@ -20,6 +29,11 @@ export default function EditPage() {
   const { currentIndex, currentItem, datasetInfo } = session ?? {};
   const setCurrentIndex = useSessionStore((s) => s.setCurrentIndex);
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
+
+  const [captionDirty, setCaptionDirty] = useState(false);
+  const [showDirtyDialog, setShowDirtyDialog] = useState(false);
+  const pendingNavigation = useRef<number | null>(null);
+  const getUnsavedTextRef = useRef<(() => string) | null>(null);
 
   const loadItem = useCallback(
     async (index: number) => {
@@ -35,8 +49,39 @@ export default function EditPage() {
     [activeProjectId, setCurrentIndex, setCurrentItem]
   );
 
+  const handleNavigate = useCallback(
+    (index: number) => {
+      if (captionDirty) {
+        pendingNavigation.current = index;
+        setShowDirtyDialog(true);
+      } else {
+        loadItem(index);
+      }
+    },
+    [captionDirty, loadItem]
+  );
+
+  const handleSaveAndGo = async () => {
+    const text = getUnsavedTextRef.current?.() ?? "";
+    const saveIndex = currentIndex ?? 0;
+    await api.saveCaption(saveIndex, text);
+    setShowDirtyDialog(false);
+    if (pendingNavigation.current !== null) {
+      loadItem(pendingNavigation.current);
+      pendingNavigation.current = null;
+    }
+  };
+
+  const handleDiscardAndGo = () => {
+    setShowDirtyDialog(false);
+    if (pendingNavigation.current !== null) {
+      loadItem(pendingNavigation.current);
+      pendingNavigation.current = null;
+    }
+  };
+
   useEffect(() => {
-    if (activeProjectId && datasetInfo && !currentItem) {
+    if (activeProjectId && datasetInfo && (!currentItem || currentItem.index !== currentIndex)) {
       loadItem(currentIndex ?? 0);
     }
   }, [activeProjectId, datasetInfo, currentItem, currentIndex, loadItem]);
@@ -45,13 +90,24 @@ export default function EditPage() {
     if (!activeProjectId) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") loadItem(Math.max(0, (currentIndex ?? 0) - 1));
+      if (e.key === "ArrowLeft") handleNavigate(Math.max(0, (currentIndex ?? 0) - 1));
       if (e.key === "ArrowRight")
-        loadItem(Math.min((datasetInfo?.total_items ?? 1) - 1, (currentIndex ?? 0) + 1));
+        handleNavigate(Math.min((datasetInfo?.total_items ?? 1) - 1, (currentIndex ?? 0) + 1));
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentIndex, datasetInfo, loadItem, activeProjectId]);
+  }, [currentIndex, datasetInfo, handleNavigate, activeProjectId]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (captionDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [captionDirty]);
 
   if (!activeProjectId) {
     return (
@@ -88,12 +144,39 @@ export default function EditPage() {
       <CaptionEditor
         caption={currentItem.caption}
         index={safeIndex}
+        savedCaption={currentItem.caption}
         onCaptionChange={(caption) =>
           setCurrentItem(activeProjectId, { ...currentItem, caption })
         }
+        onDirtyChange={setCaptionDirty}
+        getUnsavedText={(getter) => {
+          getUnsavedTextRef.current = getter;
+        }}
       />
 
-      <NavigationBar onNavigate={loadItem} />
+      <NavigationBar onNavigate={handleNavigate} />
+
+      <Dialog open={showDirtyDialog} onOpenChange={setShowDirtyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved Caption Changes</DialogTitle>
+            <DialogDescription>
+              The caption for this image has been modified. What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDirtyDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDiscardAndGo}>
+              Discard
+            </Button>
+            <Button onClick={handleSaveAndGo}>
+              Save &amp; Go
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

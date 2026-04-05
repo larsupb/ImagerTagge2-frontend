@@ -6,6 +6,7 @@ import type {
   SearchReplacePreview,
   Settings,
   Tagger,
+  TaggersResponse,
   Upscaler,
   BucketResult,
   ProjectOpenResponse,
@@ -218,7 +219,7 @@ export const api = {
   updateSetting: (key: string, value: unknown) =>
     apiFetch("/api/settings/", { method: "PUT", body: JSON.stringify({ key, value }) }),
   getUpscalers: () => apiFetch<Upscaler[]>("/api/settings/upscalers"),
-  getTaggers: () => apiFetch<Tagger[]>("/api/settings/taggers"),
+  getTaggers: () => apiFetch<TaggersResponse>("/api/settings/taggers"),
 
   // Tools
   copyImages: (targetDir: string, option: string) =>

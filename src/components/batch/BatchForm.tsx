@@ -85,7 +85,7 @@ export default function BatchForm() {
   const [logEntries, setLogEntries] = useState<BatchProgress[]>([]);
   const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
 
-  const { data: taggers } = useQuery({
+  const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
     queryFn: () => api.getTaggers(),
   });
@@ -298,7 +298,7 @@ export default function BatchForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {taggers?.map((t: Tagger) => (
+                  {taggersResponse?.taggers.map((t: Tagger) => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
                   <SelectItem value="unified">Unified</SelectItem>
