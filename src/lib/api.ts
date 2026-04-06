@@ -12,6 +12,7 @@ import type {
   ProjectOpenResponse,
   ActiveProjectsResponse,
   RecentProjectsResponse,
+  ImageVersion,
 } from "./types";
 
 let sessionId: string | null = null;
@@ -126,11 +127,26 @@ export const api = {
     }),
 
   // Captions
-  saveCaption: (index: number, caption: string) =>
-    apiFetch("/api/captions/save", {
+  saveCaption: async (index: number, caption: string, captionType: string = "tags") => {
+    return apiFetch("/api/captions/save", {
       method: "PUT",
-      body: JSON.stringify({ index, caption }),
-    }),
+      body: JSON.stringify({ index, caption, caption_type: captionType }),
+    });
+  },
+
+  setActiveCaptionType: async (index: number, captionType: string) => {
+    return apiFetch("/api/captions/set-active", {
+      method: "PUT",
+      body: JSON.stringify({ index, caption_type: captionType }),
+    });
+  },
+
+  exportCaptionsTxt: async (captionType: string = "tags") => {
+    return apiFetch<{ count: number }>("/api/captions/export-txt", {
+      method: "POST",
+      body: JSON.stringify({ caption_type: captionType }),
+    });
+  },
 
   getTagCloud: (sortBy = "frequency") =>
     apiFetch<TagCloudEntry[]>(`/api/captions/tags?sort_by=${sortBy}`),
@@ -195,6 +211,22 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ index }),
     }),
+
+  getVersions: async (index: number) => {
+    return apiFetch<ImageVersion[]>(`/api/processing/versions/${index}`);
+  },
+
+  restoreVersion: async (versionId: number) => {
+    return apiFetch(`/api/processing/versions/${versionId}/restore`, {
+      method: "POST",
+    });
+  },
+
+  deleteVersion: async (versionId: number) => {
+    return apiFetch(`/api/processing/versions/${versionId}`, {
+      method: "DELETE",
+    });
+  },
 
   // Batch
   batchProcess: (options: Record<string, unknown>) => {

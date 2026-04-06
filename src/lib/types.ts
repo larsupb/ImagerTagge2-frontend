@@ -1,3 +1,19 @@
+export interface CaptionEntry {
+  caption_type: string;
+  content: string;
+  is_active: boolean;
+}
+
+export interface ImageVersion {
+  id: number;
+  version_path: string;
+  operation: string;
+  original_width: number | null;
+  original_height: number | null;
+  original_size: number | null;
+  created_at: string;
+}
+
 export interface DatasetInfo {
   total_items: number;
   base_dir: string;
@@ -20,6 +36,7 @@ export interface MediaItem {
   media_url: string;
   thumbnail_url: string;
   caption: string;
+  captions: CaptionEntry[];
 }
 
 export interface GalleryItem {
