@@ -4,20 +4,28 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import type { Tagger } from "@/lib/types";
+import type { Tagger, CaptionEntry } from "@/lib/types";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Loader2, Plus } from "lucide-react";
 
 interface CaptionEditorProps {
   caption: string;
   index: number;
   savedCaption: string;
+  captions?: CaptionEntry[];
   onCaptionChange: (caption: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   getUnsavedText?: (getter: () => string) => void;
@@ -27,6 +35,7 @@ export default function CaptionEditor({
   caption,
   index,
   savedCaption,
+  captions,
   onCaptionChange,
   onDirtyChange,
   getUnsavedText,
@@ -34,6 +43,9 @@ export default function CaptionEditor({
   const [text, setText] = useState(caption);
   const [tagger, setTagger] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [activeType, setActiveType] = useState("tag");
+  const [newTypeInput, setNewTypeInput] = useState("");
+  const [newTypeOpen, setNewTypeOpen] = useState(false);
 
   const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
@@ -61,8 +73,50 @@ export default function CaptionEditor({
     }
   }, [getUnsavedText, text]);
 
+  useEffect(() => {
+    if (captions && captions.length > 0) {
+      const active = captions.find((c) => c.is_active);
+      setActiveType(active?.caption_type ?? "tag");
+    } else {
+      setActiveType("tag");
+    }
+  }, [captions]);
+
+  useEffect(() => {
+    if (captions) {
+      const entry = captions.find((c) => c.caption_type === activeType);
+      setText(entry?.content ?? "");
+    }
+  }, [captions, activeType]);
+
+  const handleTypeChange = async (type: string | null) => {
+    if (!type) return;
+    if (type === "__new__") {
+      setNewTypeOpen(true);
+      return;
+    }
+    if (text !== savedCaption) {
+      await api.saveCaption(index, text, activeType);
+    }
+    setActiveType(type);
+    const entry = captions?.find((c) => c.caption_type === type);
+    const newContent = entry?.content ?? "";
+    setText(newContent);
+    onCaptionChange(newContent);
+  };
+
+  const handleCreateNewType = () => {
+    const trimmed = newTypeInput.trim();
+    if (!trimmed) return;
+    setNewTypeOpen(false);
+    setNewTypeInput("");
+    setActiveType(trimmed);
+    setText("");
+    onCaptionChange("");
+  };
+
   const handleSave = async () => {
-    await api.saveCaption(index, text);
+    await api.saveCaption(index, text, activeType);
     onCaptionChange(text);
   };
 
@@ -89,6 +143,45 @@ export default function CaptionEditor({
       />
 
       <div className="flex items-center gap-2">
+        <Select value={activeType} onValueChange={handleTypeChange}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {captions?.map((c) => (
+              <SelectItem key={c.caption_type} value={c.caption_type}>
+                {c.caption_type}
+              </SelectItem>
+            ))}
+            <SelectSeparator />
+            <SelectItem value="__new__">
+              <div className="flex items-center gap-1">
+                <Plus className="w-3 h-3" />
+                New type...
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Popover open={newTypeOpen} onOpenChange={setNewTypeOpen}>
+          <PopoverTrigger asChild>
+            <div />
+          </PopoverTrigger>
+          <PopoverContent className="w-48">
+            <div className="flex flex-col gap-2">
+              <Input
+                placeholder="New caption type..."
+                value={newTypeInput}
+                onChange={(e) => setNewTypeInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateNewType()}
+              />
+              <Button size="sm" onClick={handleCreateNewType}>
+                Create
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         <Select value={tagger} onValueChange={(value) => value && setTagger(value)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue />
