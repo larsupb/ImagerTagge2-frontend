@@ -145,10 +145,11 @@ export default function EditPage() {
         caption={currentItem.caption}
         index={safeIndex}
         savedCaption={currentItem.caption}
-        captions={currentItem.captions}
-        onCaptionChange={(caption) =>
-          setCurrentItem(activeProjectId, { ...currentItem, caption })
-        }
+        captions={currentItem.captions ?? []}
+        onCaptionChange={async (caption) => {
+          setCurrentItem(activeProjectId, { ...currentItem, caption });
+          await loadItem(safeIndex);
+        }}
         onDirtyChange={setCaptionDirty}
         getUnsavedText={(getter) => {
           getUnsavedTextRef.current = getter;
