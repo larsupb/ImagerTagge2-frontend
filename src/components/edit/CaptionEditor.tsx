@@ -25,7 +25,7 @@ interface CaptionEditorProps {
   caption: string;
   index: number;
   savedCaption: string;
-  captions?: CaptionEntry[];
+  captions: CaptionEntry[];
   onCaptionChange: (caption: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   getUnsavedText?: (getter: () => string) => void;
@@ -35,7 +35,7 @@ export default function CaptionEditor({
   caption,
   index,
   savedCaption,
-  captions,
+  captions = [],
   onCaptionChange,
   onDirtyChange,
   getUnsavedText,

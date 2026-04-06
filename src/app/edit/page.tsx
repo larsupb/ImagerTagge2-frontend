@@ -145,6 +145,7 @@ export default function EditPage() {
         caption={currentItem.caption}
         index={safeIndex}
         savedCaption={currentItem.caption}
+        captions={currentItem.captions}
         onCaptionChange={(caption) =>
           setCurrentItem(activeProjectId, { ...currentItem, caption })
         }
