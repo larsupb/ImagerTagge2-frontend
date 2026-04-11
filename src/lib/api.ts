@@ -127,6 +127,14 @@ export const api = {
     }),
 
   // Captions
+  getCaptionTypes: () => apiFetch<string[]>("/api/captions/types"),
+
+  deleteCaptionType: (captionType: string) =>
+    apiFetch<{ deleted: number }>("/api/captions/types/delete", {
+      method: "POST",
+      body: JSON.stringify({ caption_type: captionType }),
+    }),
+
   saveCaption: async (index: number, caption: string, captionType: string = "tags") => {
     return apiFetch("/api/captions/save", {
       method: "PUT",
@@ -148,42 +156,43 @@ export const api = {
     });
   },
 
-  getTagCloud: (sortBy = "frequency") =>
-    apiFetch<TagCloudEntry[]>(`/api/captions/tags?sort_by=${sortBy}`),
+  getTagCloud: (sortBy = "frequency", captionType = "tags") =>
+    apiFetch<TagCloudEntry[]>(`/api/captions/tags?sort_by=${sortBy}&caption_type=${encodeURIComponent(captionType)}`),
 
-  removeTags: (tags: string[]) =>
-    apiFetch("/api/captions/tags/remove", { method: "POST", body: JSON.stringify({ tags }) }),
+  removeTags: (tags: string[], captionType = "tags") =>
+    apiFetch("/api/captions/tags/remove", { method: "POST", body: JSON.stringify({ tags, caption_type: captionType }) }),
 
-  appendTag: (tag: string) =>
-    apiFetch("/api/captions/tags/append", { method: "POST", body: JSON.stringify({ tag }) }),
+  appendTag: (tag: string, captionType = "tags") =>
+    apiFetch("/api/captions/tags/append", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType }) }),
 
-  prependTag: (tag: string) =>
-    apiFetch("/api/captions/tags/prepend", { method: "POST", body: JSON.stringify({ tag }) }),
+  prependTag: (tag: string, captionType = "tags") =>
+    apiFetch("/api/captions/tags/prepend", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType }) }),
 
-  cleanupTags: () => apiFetch("/api/captions/tags/cleanup", { method: "POST" }),
+  cleanupTags: (captionType = "tags") =>
+    apiFetch("/api/captions/tags/cleanup", { method: "POST", body: JSON.stringify({ caption_type: captionType }) }),
 
-  replaceUnderscores: () =>
-    apiFetch("/api/captions/tags/replace-underscores", { method: "POST" }),
+  replaceUnderscores: (captionType = "tags") =>
+    apiFetch("/api/captions/tags/replace-underscores", { method: "POST", body: JSON.stringify({ caption_type: captionType }) }),
 
-  searchReplacePreview: (search: string, replace: string) =>
+  searchReplacePreview: (search: string, replace: string, captionType = "tags") =>
     apiFetch<SearchReplacePreview>("/api/captions/search-replace/preview", {
       method: "POST",
-      body: JSON.stringify({ search, replace }),
+      body: JSON.stringify({ search, replace, caption_type: captionType }),
     }),
 
-  searchReplaceApply: (search: string, replace: string) =>
+  searchReplaceApply: (search: string, replace: string, captionType = "tags") =>
     apiFetch("/api/captions/search-replace/apply", {
       method: "POST",
-      body: JSON.stringify({ search, replace }),
+      body: JSON.stringify({ search, replace, caption_type: captionType }),
     }),
 
   exportJsonl: () =>
     apiFetch<{ path: string; count: number }>("/api/captions/export", { method: "POST" }),
 
-  moveToSubdir: (tags: string[], inverse: boolean, subdirectoryName: string) =>
+  moveToSubdir: (tags: string[], inverse: boolean, subdirectoryName: string, captionType = "tags") =>
     apiFetch("/api/captions/move-to-subdir", {
       method: "POST",
-      body: JSON.stringify({ tags, inverse, subdirectory_name: subdirectoryName }),
+      body: JSON.stringify({ tags, inverse, subdirectory_name: subdirectoryName, caption_type: captionType }),
     }),
 
   // Tagging
