@@ -9,22 +9,26 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface TagOperationsProps {
+  captionType: string;
   selectedTags: string[];
 }
 
-export default function TagOperations({ selectedTags }: TagOperationsProps) {
+export default function TagOperations({ captionType, selectedTags }: TagOperationsProps) {
   const [appendTag, setAppendTag] = useState("");
   const [prependTag, setPrependTag] = useState("");
   const [subdirName, setSubdirName] = useState("");
   const [inverse, setInverse] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const queryClient = useQueryClient();
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["tagCloud"] });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["tagCloud"] });
+  };
 
   const handleRemove = async () => {
     if (selectedTags.length === 0) return;
     try {
-      const result = await api.removeTags(selectedTags);
+      const result = await api.removeTags(selectedTags, captionType);
       toast.success(`Removed from ${(result as { modified: number }).modified} captions`);
       refresh();
     } catch (e) {
@@ -34,7 +38,7 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
 
   const handleCleanup = async () => {
     try {
-      const result = await api.cleanupTags();
+      const result = await api.cleanupTags(captionType);
       toast.success(`Cleaned ${(result as { modified: number }).modified} captions`);
       refresh();
     } catch (e) {
@@ -44,7 +48,7 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
 
   const handleReplaceUnderscores = async () => {
     try {
-      const result = await api.replaceUnderscores();
+      const result = await api.replaceUnderscores(captionType);
       toast.success(`Updated ${(result as { modified: number }).modified} captions`);
       refresh();
     } catch (e) {
@@ -55,7 +59,7 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
   const handleAppend = async () => {
     if (!appendTag.trim()) return;
     try {
-      const result = await api.appendTag(appendTag.trim());
+      const result = await api.appendTag(appendTag.trim(), captionType);
       toast.success(`Appended to ${(result as { modified: number }).modified} captions`);
       setAppendTag("");
       refresh();
@@ -67,7 +71,7 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
   const handlePrepend = async () => {
     if (!prependTag.trim()) return;
     try {
-      const result = await api.prependTag(prependTag.trim());
+      const result = await api.prependTag(prependTag.trim(), captionType);
       toast.success(`Prepended to ${(result as { modified: number }).modified} captions`);
       setPrependTag("");
       refresh();
@@ -79,11 +83,23 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
   const handleMoveToSubdir = async () => {
     if (selectedTags.length === 0 || !subdirName.trim()) return;
     try {
-      const result = await api.moveToSubdir(selectedTags, inverse, subdirName.trim());
+      const result = await api.moveToSubdir(selectedTags, inverse, subdirName.trim(), captionType);
       toast.success(`Moved ${(result as { moved: number }).moved} images`);
       refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to move to subdirectory");
+    }
+  };
+
+  const handleDeleteType = async () => {
+    if (deleteConfirm !== captionType) return;
+    try {
+      const result = await api.deleteCaptionType(captionType);
+      toast.success(`Removed type "${captionType}" from ${result.deleted} captions`);
+      setDeleteConfirm("");
+      queryClient.invalidateQueries({ queryKey: ["captionTypes"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove caption type");
     }
   };
 
@@ -178,6 +194,29 @@ export default function TagOperations({ selectedTags }: TagOperationsProps) {
             Apply to {selectedTags.length} tags
           </p>
         )}
+      </div>
+
+      <div className="bg-surface rounded-lg border border-border p-4">
+        <h4 className="text-sm font-medium text-text mb-3">Housekeeping</h4>
+        <p className="text-xs text-text-muted mb-3">
+          To delete the <span className="font-medium text-text">{captionType}</span> caption type from all images, type the type name to confirm.
+        </p>
+        <div className="flex gap-2 items-center">
+          <Input
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder={captionType}
+            className="w-[200px] text-sm"
+          />
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeleteType}
+            disabled={deleteConfirm !== captionType}
+          >
+            Delete Type
+          </Button>
+        </div>
       </div>
     </div>
   );

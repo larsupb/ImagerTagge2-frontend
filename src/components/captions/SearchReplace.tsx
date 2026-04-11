@@ -10,7 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export default function SearchReplace() {
+interface SearchReplaceProps {
+  captionType: string;
+}
+
+export default function SearchReplace({ captionType }: SearchReplaceProps) {
   const [search, setSearch] = useState("");
   const [replace, setReplace] = useState("");
   const [preview, setPreview] = useState<SearchReplacePreview | null>(null);
@@ -19,7 +23,7 @@ export default function SearchReplace() {
   const handlePreview = async () => {
     if (!search.trim()) return;
     try {
-      const result = await api.searchReplacePreview(search, replace);
+      const result = await api.searchReplacePreview(search, replace, captionType);
       setPreview(result);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to preview search & replace");
@@ -29,7 +33,7 @@ export default function SearchReplace() {
   const handleApply = async () => {
     if (!search.trim()) return;
     try {
-      await api.searchReplaceApply(search, replace);
+      await api.searchReplaceApply(search, replace, captionType);
       toast.success("Search & replace applied successfully");
       setPreview(null);
       setSearch("");

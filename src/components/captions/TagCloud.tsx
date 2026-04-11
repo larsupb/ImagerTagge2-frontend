@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TagCloudProps {
+  captionType: string;
   onSelectedTagsChange: (tags: string[]) => void;
 }
 
-export default function TagCloud({ onSelectedTagsChange }: TagCloudProps) {
+export default function TagCloud({ captionType, onSelectedTagsChange }: TagCloudProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = activeProjectId
     ? useSessionStore((s) => s.getProjectSession(activeProjectId))
@@ -25,8 +26,8 @@ export default function TagCloud({ onSelectedTagsChange }: TagCloudProps) {
   const [search, setSearch] = useState("");
 
   const { data: tags, isLoading, refetch } = useQuery({
-    queryKey: ["tagCloud", sortBy, session?.datasetInfo?.total_items],
-    queryFn: () => api.getTagCloud(sortBy),
+    queryKey: ["tagCloud", sortBy, captionType, session?.datasetInfo?.total_items],
+    queryFn: () => api.getTagCloud(sortBy, captionType),
     enabled: !!session?.datasetInfo,
   });
 
@@ -43,7 +44,7 @@ export default function TagCloud({ onSelectedTagsChange }: TagCloudProps) {
   };
 
   const selectAll = () => {
-    const all = new Set(filteredTags?.map((t) => t.tag) ?? []);
+    const all = new Set(filteredTags?.map((t: TagCloudEntry) => t.tag) ?? []);
     setSelected(all);
     onSelectedTagsChange(Array.from(all));
   };
