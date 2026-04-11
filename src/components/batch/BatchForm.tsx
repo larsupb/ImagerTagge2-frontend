@@ -78,6 +78,7 @@ export default function BatchForm() {
   const [caption, setCaption] = useState(false);
   const [tagger, setTagger] = useState("joytag");
   const [unifiedCaption, setUnifiedCaption] = useState("");
+  const [captionType, setCaptionType] = useState("tags");
   const [resolution, setResolution] = useState(1024);
   const [step, setStep] = useState(128);
   const [maxSteps, setMaxSteps] = useState(2);
@@ -120,6 +121,7 @@ export default function BatchForm() {
           caption,
           tagger,
           unified_caption: unifiedCaption,
+          caption_type: captionType,
           bucket_resolution: resolution,
           bucket_step: step,
           bucket_max_steps: maxSteps,
@@ -312,6 +314,15 @@ export default function BatchForm() {
                 placeholder="Enter unified caption..."
               />
             )}
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-text-secondary">Tag Type</label>
+              <Input
+                value={captionType}
+                onChange={(e) => setCaptionType(e.target.value)}
+                placeholder="tags"
+                className="w-48"
+              />
+            </div>
           </div>
         </OperationCard>
       </div>
