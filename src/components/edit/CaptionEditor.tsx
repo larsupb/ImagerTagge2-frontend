@@ -41,6 +41,7 @@ export default function CaptionEditor({
   getUnsavedText,
 }: CaptionEditorProps) {
   const [text, setText] = useState(caption);
+  const [savedContent, setSavedContent] = useState<Record<string, string>>({});
   const [tagger, setTagger] = useState("");
   const [generating, setGenerating] = useState(false);
   const [activeType, setActiveType] = useState("tag");
@@ -59,13 +60,18 @@ export default function CaptionEditor({
   }, [taggersResponse?.default_tagger, tagger]);
 
   useEffect(() => {
-    setText(caption);
-  }, [caption]);
+    if (!captions || captions.length === 0) {
+      setText(caption);
+    }
+  }, [caption, captions]);
+
+  const dirty = captions && captions.length > 0
+    ? text !== (savedContent[activeType] ?? "")
+    : text !== savedCaption;
 
   useEffect(() => {
-    const dirty = text !== savedCaption;
     onDirtyChange?.(dirty);
-  }, [text, savedCaption, onDirtyChange]);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     if (getUnsavedText) {
@@ -75,11 +81,21 @@ export default function CaptionEditor({
 
   useEffect(() => {
     if (captions && captions.length > 0) {
-      const active = captions.find((c) => c.is_active);
-      setActiveType(active?.caption_type ?? "tag");
+      const map: Record<string, string> = {};
+      for (const c of captions) {
+        map[c.caption_type] = c.content ?? "";
+      }
+      setSavedContent(map);
+      const currentTypeExists = captions.some((c) => c.caption_type === activeType);
+      if (!currentTypeExists) {
+        const active = captions.find((c) => c.is_active);
+        setActiveType(active?.caption_type ?? "tag");
+      }
     } else {
+      setSavedContent({});
       setActiveType("tag");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [captions]);
 
   useEffect(() => {
@@ -95,14 +111,14 @@ export default function CaptionEditor({
       setNewTypeOpen(true);
       return;
     }
-    if (text !== savedCaption) {
+    if (text !== (savedContent[activeType] ?? "")) {
       await api.saveCaption(index, text, activeType);
+      setSavedContent((prev) => ({ ...prev, [activeType]: text }));
     }
     setActiveType(type);
     const entry = captions?.find((c) => c.caption_type === type);
     const newContent = entry?.content ?? "";
     setText(newContent);
-    onCaptionChange(newContent);
   };
 
   const handleCreateNewType = () => {
@@ -112,11 +128,11 @@ export default function CaptionEditor({
     setNewTypeInput("");
     setActiveType(trimmed);
     setText("");
-    onCaptionChange("");
   };
 
   const handleSave = async () => {
     await api.saveCaption(index, text, activeType);
+    setSavedContent((prev) => ({ ...prev, [activeType]: text }));
     onCaptionChange(text);
   };
 
@@ -129,8 +145,6 @@ export default function CaptionEditor({
       setGenerating(false);
     }
   };
-
-  const dirty = text !== savedCaption;
 
   return (
     <div className="bg-surface rounded-lg border border-border p-4 flex flex-col gap-3">
@@ -153,6 +167,11 @@ export default function CaptionEditor({
                 {c.caption_type}
               </SelectItem>
             ))}
+            {activeType && activeType !== "__new__" && !captions?.find((c) => c.caption_type === activeType) && (
+              <SelectItem key={activeType} value={activeType}>
+                {activeType}
+              </SelectItem>
+            )}
             <SelectSeparator />
             <SelectItem value="__new__">
               <div className="flex items-center gap-1">
