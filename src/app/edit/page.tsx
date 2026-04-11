@@ -137,7 +137,10 @@ export default function EditPage() {
         {currentItem.is_video ? (
           <VideoPlayer mediaUrl={getMediaUrl(currentItem.index)} />
         ) : (
-          <ImageViewer mediaUrl={getMediaUrl(currentItem.index)} filename={currentItem.filename} />
+          <ImageViewer
+            mediaUrl={`${getMediaUrl(currentItem.index)}&v=${encodeURIComponent(`${currentItem.filename}-${currentItem.file_size ?? ""}`)}`}
+            filename={currentItem.filename}
+          />
         )}
       </div>
 

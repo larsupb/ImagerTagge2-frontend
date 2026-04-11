@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpCircle, Eraser, VenetianMask, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
+import VersionHistoryDialog from "./VersionHistoryDialog";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,7 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const currentItem = session?.currentItem;
 
@@ -34,6 +37,8 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
       await api.upscale(index);
       await api.saveUpscaled(index);
       onRefresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upscale failed");
     } finally {
       setProcessing(null);
     }
@@ -44,6 +49,8 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
     try {
       await api.removeBackground(index);
       onRefresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Remove background failed");
     } finally {
       setProcessing(null);
     }
@@ -54,6 +61,8 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
     try {
       await api.generateMask(index);
       onRefresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Generate mask failed");
     } finally {
       setProcessing(null);
     }
@@ -119,6 +128,16 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
         </TooltipContent>
       </Tooltip>
 
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => setHistoryOpen(true)}
+        >
+          <History className="size-4 text-blue-500" />
+        </TooltipTrigger>
+        <TooltipContent>Version History</TooltipContent>
+      </Tooltip>
+
       <div className="flex-1" />
 
       {renaming ? (
@@ -160,6 +179,13 @@ export default function ImageToolbar({ index, onRefresh }: ImageToolbarProps) {
         message={`Delete ${currentItem?.filename}? This also removes its caption and mask.`}
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <VersionHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        index={index}
+        onRestored={onRefresh}
       />
     </div>
   );

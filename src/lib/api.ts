@@ -231,8 +231,8 @@ export const api = {
     return apiFetch<ImageVersion[]>(`/api/processing/versions/${index}`);
   },
 
-  restoreVersion: async (versionId: number) => {
-    return apiFetch(`/api/processing/versions/${versionId}/restore`, {
+  restoreVersion: async (versionId: number, index: number) => {
+    return apiFetch(`/api/processing/versions/${versionId}/restore?index=${index}`, {
       method: "POST",
     });
   },
