@@ -278,6 +278,17 @@ export const api = {
   // Validation
   validate: () => apiFetch("/api/settings/validation"),
 
+  // PromptGen
+  generatePrompt: (captionType: string, exampleCount: number, userPrompt: string) =>
+    apiFetch<{ prompt: string }>("/api/promptgen/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        caption_type: captionType,
+        example_count: exampleCount,
+        user_prompt: userPrompt
+      }),
+    }),
+
   // Media URLs
   mediaUrl: getMediaUrl,
   thumbnailUrl: getThumbnailUrl,
