@@ -11,7 +11,6 @@ interface ProjectStore {
 
   openProject: (
     path: string,
-    masksPath?: string,
     onlyMissing?: boolean,
     subdirs?: boolean
   ) => Promise<ProjectOpenResponse>;
@@ -28,8 +27,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   recentProjects: [],
   isLoading: false,
 
-  openProject: async (path, masksPath, onlyMissing, subdirs) => {
-    const result = await api.openProject(path, masksPath, onlyMissing, subdirs);
+  openProject: async (path, onlyMissing, subdirs) => {
+    const result = await api.openProject(path, onlyMissing, subdirs);
     const sessionId = result.session_id;
     setSessionId(sessionId);
     useSessionStore.getState().setDatasetInfo(sessionId, {

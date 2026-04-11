@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import { FolderOpen } from "lucide-react";
-import { api, getMediaUrl } from "@/lib/api";
+import { api, getMediaUrl, getMaskUrl } from "@/lib/api";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import EmptyState from "@/components/shared/EmptyState";
@@ -31,6 +31,8 @@ export default function EditPage() {
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
 
   const [captionDirty, setCaptionDirty] = useState(false);
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
   const pendingNavigation = useRef<number | null>(null);
   const getUnsavedTextRef = useRef<(() => string) | null>(null);
@@ -42,6 +44,7 @@ export default function EditPage() {
         const item = await api.getItem(index);
         setCurrentIndex(activeProjectId, index);
         setCurrentItem(activeProjectId, item);
+        if (!item.has_mask) setShowMask(false);
       } catch {
         // index out of range — stay put
       }
@@ -131,7 +134,7 @@ export default function EditPage() {
 
   return (
     <div className="flex flex-col h-full gap-3">
-      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} />
+      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} />
 
       <div className="flex-1 min-h-0">
         {currentItem.is_video ? (
@@ -139,7 +142,10 @@ export default function EditPage() {
         ) : (
           <ImageViewer
             mediaUrl={`${getMediaUrl(currentItem.index)}&v=${encodeURIComponent(`${currentItem.filename}-${currentItem.file_size ?? ""}`)}`}
+            maskUrl={currentItem.has_mask ? getMaskUrl(currentItem.index) : null}
             filename={currentItem.filename}
+            showMask={showMask}
+            processing={processing}
           />
         )}
       </div>

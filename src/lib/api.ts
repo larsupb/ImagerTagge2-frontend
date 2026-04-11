@@ -41,6 +41,10 @@ export function getThumbnailUrl(index: number): string {
   return `/api/media/thumbnail/${index}?session_id=${sessionId}`;
 }
 
+export function getMaskUrl(index: number): string {
+  return `/api/media/mask/${index}?session_id=${sessionId}`;
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const sid = await getSessionId();
   const res = await fetch(path, {
@@ -60,18 +64,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 export const api = {
   // Project management
-  openProject: (
-    path: string,
-    masksPath?: string,
-    onlyMissing = false,
-    subdirs = false
-  ) =>
+  openProject: (path: string, onlyMissing = false, subdirs = false) =>
     fetch("/api/projects/open", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         path,
-        masks_path: masksPath,
         only_missing_captions: onlyMissing,
         include_subdirectories: subdirs,
       }),
@@ -99,12 +97,11 @@ export const api = {
     }),
 
   // Dataset (backward compatible)
-  loadDataset: (path: string, masksPath?: string, onlyMissing = false, subdirs = false) =>
+  loadDataset: (path: string, onlyMissing = false, subdirs = false) =>
     apiFetch<DatasetInfo>("/api/dataset/load", {
       method: "POST",
       body: JSON.stringify({
         path,
-        masks_path: masksPath,
         only_missing_captions: onlyMissing,
         include_subdirectories: subdirs,
       }),
