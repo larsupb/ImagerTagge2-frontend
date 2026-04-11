@@ -237,43 +237,65 @@ export default function BatchForm() {
           checked={bucketResize}
           onCheckedChange={setBucketResize}
         >
-          <div className="flex gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-text-secondary">Base Res</label>
-              <Select value={String(resolution)} onValueChange={(v) => setResolution(Number(v))}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[512, 768, 1024, 1280, 1536, 1792, 2048].map((r) => (
-                    <SelectItem key={r} value={String(r)}>{r}</SelectItem>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-text-secondary">Base Res</label>
+                <Select value={String(resolution)} onValueChange={(v) => setResolution(Number(v))}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[512, 768, 1024, 1280, 1536, 1792, 2048].map((r) => (
+                      <SelectItem key={r} value={String(r)}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-text-secondary">Step</label>
+                <Input
+                  type="number"
+                  value={step}
+                  onChange={(e) => setStep(Number(e.target.value))}
+                  min={64}
+                  max={512}
+                  step={64}
+                  className="w-20"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-text-secondary">Max Steps</label>
+                <Input
+                  type="number"
+                  value={maxSteps}
+                  onChange={(e) => setMaxSteps(Number(e.target.value))}
+                  min={1}
+                  max={4}
+                  className="w-16"
+                />
+              </div>
+            </div>
+            <div>
+              <Button variant="outline" size="sm" onClick={handleAnalyzeBuckets} disabled={isRunning}>
+                <BarChart3 className="w-4 h-4 mr-1.5" />
+                Analyze Buckets
+              </Button>
+            </div>
+            {bucketResult && (
+              <div>
+                <p className="text-xs text-text-muted mb-2">
+                  Bucket Analysis ({bucketResult.total_images} images)
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {bucketResult.buckets.map((b, i) => (
+                    <div key={i} className="bg-surface-raised rounded border border-border p-2 text-xs text-text-secondary">
+                      {b.width}×{b.height}: {b.count} images
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-text-secondary">Step</label>
-              <Input
-                type="number"
-                value={step}
-                onChange={(e) => setStep(Number(e.target.value))}
-                min={64}
-                max={512}
-                step={64}
-                className="w-20"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-text-secondary">Max Steps</label>
-              <Input
-                type="number"
-                value={maxSteps}
-                onChange={(e) => setMaxSteps(Number(e.target.value))}
-                min={1}
-                max={4}
-                className="w-16"
-              />
-            </div>
+                </div>
+              </div>
+            )}
           </div>
         </OperationCard>
 
@@ -329,14 +351,6 @@ export default function BatchForm() {
 
       <div className="flex gap-3 pt-2">
         <Button
-          variant="outline"
-          onClick={handleAnalyzeBuckets}
-          disabled={isRunning}
-        >
-          <BarChart3 className="w-4 h-4 mr-1.5" />
-          Analyze Buckets
-        </Button>
-        <Button
           onClick={handleStart}
           disabled={isRunning || !hasAnyOperation}
           className="ml-auto"
@@ -347,21 +361,6 @@ export default function BatchForm() {
       </div>
 
       <ProgressLog entries={logEntries} isRunning={isRunning} />
-
-      {bucketResult && (
-        <div className="bg-surface rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-text mb-3">
-            Bucket Analysis ({bucketResult.total_images} images)
-          </h3>
-          <div className="grid grid-cols-3 gap-2">
-            {bucketResult.buckets.map((b, i) => (
-              <div key={i} className="bg-surface-raised rounded border border-border p-2 text-xs text-text-secondary">
-                {b.width}×{b.height}: {b.count} images
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
