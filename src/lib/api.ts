@@ -129,6 +129,12 @@ export const api = {
   // Captions
   getCaptionTypes: () => apiFetch<string[]>("/api/captions/types"),
 
+  renameCaptionType: (oldType: string, newType: string) =>
+    apiFetch<{ updated: number }>("/api/captions/types/rename", {
+      method: "POST",
+      body: JSON.stringify({ old_type: oldType, new_type: newType }),
+    }),
+
   deleteCaptionType: (captionType: string) =>
     apiFetch<{ deleted: number }>("/api/captions/types/delete", {
       method: "POST",

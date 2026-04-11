@@ -18,6 +18,7 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
   const [prependTag, setPrependTag] = useState("");
   const [subdirName, setSubdirName] = useState("");
   const [inverse, setInverse] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const queryClient = useQueryClient();
 
@@ -88,6 +89,19 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
       refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to move to subdirectory");
+    }
+  };
+
+  const handleRenameType = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === captionType) return;
+    try {
+      const result = await api.renameCaptionType(captionType, trimmed);
+      toast.success(`Renamed "${captionType}" to "${trimmed}" across ${result.updated} captions`);
+      setRenameValue("");
+      queryClient.invalidateQueries({ queryKey: ["captionTypes"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to rename caption type");
     }
   };
 
@@ -197,9 +211,28 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
       </div>
 
       <div className="bg-surface rounded-lg border border-border p-4">
-        <h4 className="text-sm font-medium text-text mb-3">Housekeeping</h4>
-        <p className="text-xs text-text-muted mb-3">
-          To delete the <span className="font-medium text-text">{captionType}</span> caption type from all images, type the type name to confirm.
+        <h4 className="text-sm font-medium text-text mb-4">Housekeeping</h4>
+
+        <p className="text-xs text-text-muted mb-2">Rename type</p>
+        <div className="flex gap-2 items-center mb-4">
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="New type name..."
+            className="w-[200px] text-sm"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRenameType}
+            disabled={!renameValue.trim() || renameValue.trim() === captionType}
+          >
+            Rename
+          </Button>
+        </div>
+
+        <p className="text-xs text-text-muted mb-2">
+          Delete type — type <span className="font-medium text-text">{captionType}</span> to confirm
         </p>
         <div className="flex gap-2 items-center">
           <Input
