@@ -95,6 +95,11 @@ export interface Settings {
     model: string;
     prompt: string;
   };
+  llm_endpoint: {
+    api_key: string;
+    base_url: string;
+    model: string;
+  };
 }
 
 export interface Tagger {

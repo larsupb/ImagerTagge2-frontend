@@ -308,6 +308,54 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="LLM Endpoint (PromptGen)">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Host (Base URL)</label>
+          <Input
+            value={localSettings.llm_endpoint.base_url}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                llm_endpoint: { ...localSettings.llm_endpoint, base_url: e.target.value },
+              })
+            }
+            onBlur={() => save("llm_endpoint", localSettings.llm_endpoint)}
+            placeholder="http://localhost:11434/v1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Model</label>
+          <Input
+            value={localSettings.llm_endpoint.model}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                llm_endpoint: { ...localSettings.llm_endpoint, model: e.target.value },
+              })
+            }
+            onBlur={() => save("llm_endpoint", localSettings.llm_endpoint)}
+            placeholder="qwen3:32b"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">API Key</label>
+          <Input
+            type="password"
+            value={localSettings.llm_endpoint.api_key}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                llm_endpoint: { ...localSettings.llm_endpoint, api_key: e.target.value },
+              })
+            }
+            onBlur={() => save("llm_endpoint", localSettings.llm_endpoint)}
+            placeholder="Leave empty for local endpoints"
+          />
+        </div>
+      </Section>
+
       <Section title="Paths">
         <div>
           <label className="block text-sm text-text-secondary mb-1">Models Directory</label>
