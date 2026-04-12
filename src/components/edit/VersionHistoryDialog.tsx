@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { History, RotateCcw, Trash2 } from "lucide-react";
+import { History, RotateCcw, Trash2, Eye } from "lucide-react";
 import type { ImageVersion } from "@/lib/types";
+import { useSessionStore } from "@/stores/session";
+import { useProjectStore } from "@/stores/projectStore";
 
 interface VersionHistoryDialogProps {
   open: boolean;
@@ -22,6 +25,11 @@ export default function VersionHistoryDialog({
   onRestored,
 }: VersionHistoryDialogProps) {
   const queryClient = useQueryClient();
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const session = activeProjectId
+    ? useSessionStore((s) => s.getProjectSession(activeProjectId))
+    : null;
+  const [previewVersion, setPreviewVersion] = useState<ImageVersion | null>(null);
 
   const { data: versions, isLoading } = useQuery({
     queryKey: ["versions", index],
@@ -55,7 +63,12 @@ export default function VersionHistoryDialog({
     },
   });
 
+  const previewUrl = previewVersion && activeProjectId
+    ? api.getVersionImageUrl(previewVersion.id, activeProjectId)
+    : null;
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -92,6 +105,14 @@ export default function VersionHistoryDialog({
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => setPreviewVersion(v)}
+                      title="Show"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => restoreMutation.mutate({ versionId: v.id })}
                       disabled={restoreMutation.isPending}
                       title="Restore"
@@ -120,5 +141,38 @@ export default function VersionHistoryDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={!!previewVersion} onOpenChange={(open) => !open && setPreviewVersion(null)}>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-4">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="w-4 h-4" />
+            Version Preview
+          </DialogTitle>
+        </DialogHeader>
+        {previewUrl ? (
+          <div className="flex justify-center">
+            <img
+              src={previewUrl}
+              alt={`Version ${previewVersion?.operation}`}
+              className="max-w-full max-h-[75vh] object-contain rounded"
+            />
+          </div>
+        ) : null}
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-text-muted">
+            {previewVersion?.original_width && previewVersion?.original_height
+              ? `${previewVersion.original_width} × ${previewVersion.original_height}`
+              : "—"}
+            {" · "}
+            {previewVersion ? new Date(previewVersion.created_at).toLocaleString() : ""}
+          </p>
+          <Button variant="outline" onClick={() => setPreviewVersion(null)}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

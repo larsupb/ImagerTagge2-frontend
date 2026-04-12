@@ -262,6 +262,10 @@ export const api = {
     return apiFetch<ImageVersion[]>(`/api/processing/versions/${index}`);
   },
 
+  getVersionImageUrl: (versionId: number, projectId: string) => {
+    return `/api/media/version/${versionId}?session_id=${projectId}`;
+  },
+
   restoreVersion: async (versionId: number, index: number) => {
     return apiFetch(`/api/processing/versions/${versionId}/restore?index=${index}`, {
       method: "POST",
