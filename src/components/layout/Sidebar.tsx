@@ -18,7 +18,7 @@ const navItems = [
   { href: "/browse", label: "Browse", icon: Image },
   { href: "/edit", label: "Edit", icon: Pencil },
   { href: "/captions", label: "Captions", icon: Tags },
-  { href: "/batch", label: "Batch", icon: Layer },
+  { href: "/batch", label: "Batch", icon: Layers },
   { href: "/export", label: "Export", icon: Download },
   { href: "/promptgen", label: "PromptGen", icon: Wand2 },
   { href: "/tools", label: "Tools", icon: Wrench },
