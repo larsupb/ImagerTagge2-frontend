@@ -366,13 +366,6 @@ export const api = {
   getUpscalers: () => apiFetch<Upscaler[]>("/api/settings/upscalers"),
   getTaggers: () => apiFetch<TaggersResponse>("/api/settings/taggers"),
 
-  // Tools
-  copyImages: (targetDir: string, option: string) =>
-    apiFetch("/api/settings/tools/copy", {
-      method: "POST",
-      body: JSON.stringify({ target_directory: targetDir, copy_option: option }),
-    }),
-
   // Validation
   validate: () => apiFetch("/api/settings/validation"),
 

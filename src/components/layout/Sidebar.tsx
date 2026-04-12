@@ -7,7 +7,6 @@ import {
   Pencil,
   Tags,
   Layers,
-  Wrench,
   CheckCircle,
   Settings,
   Wand2,
@@ -21,7 +20,6 @@ const navItems = [
   { href: "/batch", label: "Batch", icon: Layers },
   { href: "/export", label: "Export", icon: Download },
   { href: "/promptgen", label: "PromptGen", icon: Wand2 },
-  { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/validation", label: "Validation", icon: CheckCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
