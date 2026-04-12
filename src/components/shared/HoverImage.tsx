@@ -41,7 +41,7 @@ export function HoverImage({ src, alt, className = "", previewClassName = "", pr
       onMouseEnter={() => setShowPreview(true)}
       onMouseLeave={() => setShowPreview(false)}
     >
-      <img src={src} alt={alt} className="block w-full h-full object-cover" style={{ width: "100%", height: "100%" }} />
+      <img src={src} alt={alt} className="block w-full h-full object-contain" />
       {showPreview && (
         <div
           className={`fixed z-50 pointer-events-none ${previewClassName}`}
@@ -55,7 +55,7 @@ export function HoverImage({ src, alt, className = "", previewClassName = "", pr
                 ? "animate-in fade-in slide-in-from-bottom-2" 
                 : "animate-in fade-in slide-in-from-top-2"
             }`}
-            style={{ width: "auto", height: "auto", maxWidth: "800px", maxHeight: "600px" }}
+            style={{ maxWidth: "800px", maxHeight: "600px" }}
           />
         </div>
       )}

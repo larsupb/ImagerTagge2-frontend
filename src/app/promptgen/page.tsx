@@ -31,7 +31,13 @@ export default function PromptGenPage() {
 
   useEffect(() => {
     if (!activeProjectId) return;
-    api.getCaptionTypes().then(setCaptionTypes).catch(console.error);
+    api.getCaptionTypes().then((types) => {
+      const validTypes = types.filter((t) => t.trim().length > 0);
+      setCaptionTypes(validTypes);
+      if (selectedType && !validTypes.includes(selectedType)) {
+        setSelectedType(validTypes[0] || "tags");
+      }
+    }).catch(console.error);
   }, [activeProjectId]);
 
   if (!activeProjectId) {
@@ -81,7 +87,7 @@ export default function PromptGenPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {captionTypes.map((type) => (
+                {captionTypes.filter((t) => t.trim().length > 0).map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
