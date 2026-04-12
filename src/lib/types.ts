@@ -88,6 +88,7 @@ export interface Settings {
   combo_taggers: string[];
   florence_settings: { prompt: string };
   rembg: { model: string };
+  white_balance_method?: string;
   vlm_endpoint: {
     api_key: string;
     base_url: string;
