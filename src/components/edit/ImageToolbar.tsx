@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import VersionHistoryDialog from "./VersionHistoryDialog";
@@ -20,9 +20,11 @@ interface ImageToolbarProps {
   onMaskGenerated: () => void;
   showMask: boolean;
   setShowMask: (v: boolean) => void;
+  cropMode?: boolean;
+  setCropMode?: (v: boolean) => void;
 }
 
-export default function ImageToolbar({ index, onRefresh, processing, setProcessing, onMaskGenerated, showMask, setShowMask }: ImageToolbarProps) {
+export default function ImageToolbar({ index, onRefresh, processing, setProcessing, onMaskGenerated, showMask, setShowMask, cropMode, setCropMode }: ImageToolbarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = activeProjectId
     ? useSessionStore((s) => s.getProjectSession(activeProjectId))
@@ -84,6 +86,10 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
     await api.renameItem(index, newName);
     setRenaming(false);
     onRefresh();
+  };
+
+  const handleCrop = () => {
+    if (setCropMode) setCropMode(!cropMode);
   };
 
   return (
@@ -156,6 +162,17 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
           <History className="size-4 text-blue-500" />
         </TooltipTrigger>
         <TooltipContent>Version History</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={handleCrop}
+          disabled={!!processing || currentItem?.is_video}
+        >
+          <Crop className={`size-4 ${cropMode ? "text-green-400" : "text-green-500"}`} />
+        </TooltipTrigger>
+        <TooltipContent>Crop</TooltipContent>
       </Tooltip>
 
       <div className="flex-1" />

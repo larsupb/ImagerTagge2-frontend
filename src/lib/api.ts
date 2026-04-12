@@ -243,6 +243,13 @@ export const api = {
       body: JSON.stringify({ index }),
     }),
 
+  crop: async (index: number, x: number, y: number, width: number, height: number) => {
+    return apiFetch("/api/processing/crop", {
+      method: "POST",
+      body: JSON.stringify({ index, x, y, width, height }),
+    });
+  },
+
   getVersions: async (index: number) => {
     return apiFetch<ImageVersion[]>(`/api/processing/versions/${index}`);
   },
@@ -281,6 +288,12 @@ export const api = {
     apiFetch<ColorMatchPreviewResult>("/api/batch/preview-color-match", {
       method: "POST",
       body: JSON.stringify({ method, reference, sample_count: sampleCount }),
+    }),
+
+  previewWhiteBalance: (method: string, sampleCount = 4) =>
+    apiFetch<ColorMatchPreviewResult>("/api/batch/preview-white-balance", {
+      method: "POST",
+      body: JSON.stringify({ method, sample_count: sampleCount }),
     }),
 
   // Settings

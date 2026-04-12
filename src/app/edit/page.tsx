@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import { FolderOpen } from "lucide-react";
+import { toast } from "sonner";
 import { api, getMediaUrl, getMaskUrl } from "@/lib/api";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
@@ -34,6 +35,7 @@ export default function EditPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
+  const [cropMode, setCropMode] = useState(false);
   const pendingNavigation = useRef<number | null>(null);
   const getUnsavedTextRef = useRef<(() => string) | null>(null);
 
@@ -80,6 +82,24 @@ export default function EditPage() {
     if (pendingNavigation.current !== null) {
       loadItem(pendingNavigation.current);
       pendingNavigation.current = null;
+    }
+  };
+
+  const handleCropComplete = async (
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => {
+    setProcessing("crop");
+    try {
+      await api.crop(safeIndex, x, y, width, height);
+      setCropMode(false);
+      loadItem(safeIndex);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Crop failed");
+    } finally {
+      setProcessing(null);
     }
   };
 
@@ -134,7 +154,7 @@ export default function EditPage() {
 
   return (
     <div className="flex flex-col h-full gap-3">
-      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} />
+      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} />
 
       <div className="flex-1 min-h-0">
         {currentItem.is_video ? (
@@ -146,6 +166,9 @@ export default function EditPage() {
             filename={currentItem.filename}
             showMask={showMask}
             processing={processing}
+            cropMode={cropMode}
+            onCropComplete={handleCropComplete}
+            onCropCancel={() => setCropMode(false)}
           />
         )}
       </div>
