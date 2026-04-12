@@ -96,7 +96,11 @@ export default function BatchForm() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [colorMatchHistogram, setColorMatchHistogram] = useState<{ l: number[]; a: number[]; b: number[] } | null>(null);
   const [whiteBalance, setWhiteBalance] = useState(false);
-  const [whiteBalanceMethod, setWhiteBalanceMethod] = useState("gray_world");
+  const [whiteBalanceMethod, setWhiteBalanceMethod] = useState(
+    settings?.white_balance_method || "gray_world"
+  );
+  const [whiteBalancePreview, setWhiteBalancePreview] = useState<ColorMatchPreviewItem[]>([]);
+  const [isWhiteBalancePreviewing, setIsWhiteBalancePreviewing] = useState(false);
 
   const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
@@ -112,6 +116,12 @@ export default function BatchForm() {
     queryKey: ["settings"],
     queryFn: () => api.getSettings(),
   });
+
+  useEffect(() => {
+    if (settings?.white_balance_method) {
+      setWhiteBalanceMethod(settings.white_balance_method);
+    }
+  }, [settings]);
 
   const { data: datasetInfo } = useQuery({
     queryKey: ["datasetInfo"],
@@ -222,6 +232,19 @@ export default function BatchForm() {
       toast.error(e instanceof Error ? e.message : "Preview failed");
     } finally {
       setIsPreviewing(false);
+    }
+  };
+
+  const handleWhiteBalancePreview = async () => {
+    setIsWhiteBalancePreviewing(true);
+    setWhiteBalancePreview([]);
+    try {
+      const result = await api.previewWhiteBalance(whiteBalanceMethod, 4);
+      setWhiteBalancePreview(result.previews);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Preview failed");
+    } finally {
+      setIsWhiteBalancePreviewing(false);
     }
   };
 
@@ -408,18 +431,53 @@ export default function BatchForm() {
             setWhiteBalance(checked);
           }}
         >
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-text-secondary">Method</label>
-            <Select value={whiteBalanceMethod} onValueChange={(v) => setWhiteBalanceMethod(v ?? "gray_world")}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gray_world">Gray World</SelectItem>
-                <SelectItem value="shades_of_gray">Shades of Gray</SelectItem>
-                <SelectItem value="gray_edge">Gray Edge</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-text-secondary">Method</label>
+              <Select value={whiteBalanceMethod} onValueChange={(v) => setWhiteBalanceMethod(v ?? "gray_world")}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gray_world">Gray World</SelectItem>
+                  <SelectItem value="shades_of_gray">Shades of Gray</SelectItem>
+                  <SelectItem value="gray_edge">Gray Edge</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWhiteBalancePreview}
+              disabled={isWhiteBalancePreviewing || !whiteBalance}
+            >
+              <Eye className="w-4 h-4 mr-1.5" />
+              {isWhiteBalancePreviewing ? "Previewing..." : "Preview"}
+            </Button>
+            {whiteBalancePreview.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-text-muted mb-2">Preview Results</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {whiteBalancePreview.map((preview) => (
+                    <div key={preview.index} className="flex flex-col gap-1">
+                      <div className="text-xs text-text-secondary truncate">{preview.filename}</div>
+                      <div className="flex gap-0.5">
+                        <HoverImage
+                          src={`data:image/jpeg;base64,${preview.before}`}
+                          alt="Before"
+                          className="w-full h-16 rounded"
+                        />
+                        <HoverImage
+                          src={`data:image/jpeg;base64,${preview.after}`}
+                          alt="After"
+                          className="w-full h-16 rounded"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </OperationCard>
 
