@@ -96,9 +96,7 @@ export default function BatchForm() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [colorMatchHistogram, setColorMatchHistogram] = useState<{ l: number[]; a: number[]; b: number[] } | null>(null);
   const [whiteBalance, setWhiteBalance] = useState(false);
-  const [whiteBalanceMethod, setWhiteBalanceMethod] = useState(
-    settings?.white_balance_method || "gray_world"
-  );
+  const [whiteBalanceMethod, setWhiteBalanceMethod] = useState("gray_world");
   const [whiteBalancePreview, setWhiteBalancePreview] = useState<ColorMatchPreviewItem[]>([]);
   const [isWhiteBalancePreviewing, setIsWhiteBalancePreviewing] = useState(false);
 
