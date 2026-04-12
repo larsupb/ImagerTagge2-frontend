@@ -11,13 +11,15 @@ import {
   CheckCircle,
   Settings,
   Wand2,
+  Download,
 } from "lucide-react";
 
 const navItems = [
   { href: "/browse", label: "Browse", icon: Image },
   { href: "/edit", label: "Edit", icon: Pencil },
   { href: "/captions", label: "Captions", icon: Tags },
-  { href: "/batch", label: "Batch", icon: Layers },
+  { href: "/batch", label: "Batch", icon: Layer },
+  { href: "/export", label: "Export", icon: Download },
   { href: "/promptgen", label: "PromptGen", icon: Wand2 },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/validation", label: "Validation", icon: CheckCircle },
