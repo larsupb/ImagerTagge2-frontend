@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, getCurrentSessionId } from "@/lib/api";
-import type { BatchProgress, BucketResult, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem, TaskLogEntry } from "@/lib/types";
+import type { BatchProgress, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem, TaskLogEntry } from "@/lib/types";
 import { useTaskPolling } from "../../hooks/useTaskPolling";
 import ProgressLog from "./ProgressLog";
 import { HoverImage } from "@/components/shared/HoverImage";
@@ -15,13 +15,11 @@ import { toast } from "sonner";
 import {
   Type,
   ImagePlus,
-  Grid3X3,
   Layers,
   FileText,
   ChevronDown,
   ChevronUp,
   Play,
-  BarChart3,
   Palette,
   Eye,
   Sun,
@@ -78,19 +76,14 @@ export default function BatchForm() {
   const [renameOffset, setRenameOffset] = useState(0);
   const [upscale, setUpscale] = useState(false);
   const [batchUpscaler, setBatchUpscaler] = useState("");
-  const [bucketResize, setBucketResize] = useState(false);
   const [mask, setMask] = useState(false);
   const [caption, setCaption] = useState(false);
   const [tagger, setTagger] = useState("joytag");
   const [unifiedCaption, setUnifiedCaption] = useState("");
   const [captionType, setCaptionType] = useState("tags");
-  const [resolution, setResolution] = useState(1024);
-  const [step, setStep] = useState(128);
-  const [maxSteps, setMaxSteps] = useState(2);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<BatchProgress[]>([]);
-  const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
   const [colorMatch, setColorMatch] = useState(false);
   const [colorMatchMethod, setColorMatchMethod] = useState("histogram");
   const [colorMatchReference, setColorMatchReference] = useState(0);
@@ -183,15 +176,11 @@ export default function BatchForm() {
         rename_offset: renameOffset,
         upscale,
         upscaler: batchUpscaler,
-        bucket_resize: bucketResize,
         mask,
         caption,
         tagger,
         unified_caption: unifiedCaption,
         caption_type: captionType,
-        bucket_resolution: resolution,
-        bucket_step: step,
-        bucket_max_steps: maxSteps,
         color_match: colorMatch,
         color_match_method: colorMatchMethod,
         color_match_reference: colorMatchReference,
@@ -202,16 +191,6 @@ export default function BatchForm() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to start batch");
       setIsRunning(false);
-    }
-  };
-
-  const handleAnalyzeBuckets = async () => {
-    try {
-      const result = await api.analyzeBuckets(resolution, step, maxSteps);
-      setBucketResult(result);
-      toast.success("Bucket analysis complete");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Bucket analysis failed");
     }
   };
 
@@ -241,7 +220,7 @@ export default function BatchForm() {
     }
   };
 
-  const hasAnyOperation = rename || upscale || bucketResize || mask || caption || colorMatch || whiteBalance;
+  const hasAnyOperation = rename || upscale || mask || caption || colorMatch || whiteBalance;
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -293,75 +272,6 @@ export default function BatchForm() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </OperationCard>
-
-        <OperationCard
-          icon={<Grid3X3 className="w-5 h-5" />}
-          title="Bucket Resize"
-          description="Resize images to optimal bucket dimensions for training."
-          checked={bucketResize}
-          onCheckedChange={setBucketResize}
-        >
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-text-secondary">Base Res</label>
-                <Select value={String(resolution)} onValueChange={(v) => setResolution(Number(v))}>
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[512, 768, 1024, 1280, 1536, 1792, 2048].map((r) => (
-                      <SelectItem key={r} value={String(r)}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-text-secondary">Step</label>
-                <Input
-                  type="number"
-                  value={step}
-                  onChange={(e) => setStep(Number(e.target.value))}
-                  min={64}
-                  max={512}
-                  step={64}
-                  className="w-20"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-text-secondary">Max Steps</label>
-                <Input
-                  type="number"
-                  value={maxSteps}
-                  onChange={(e) => setMaxSteps(Number(e.target.value))}
-                  min={1}
-                  max={4}
-                  className="w-16"
-                />
-              </div>
-            </div>
-            <div>
-              <Button variant="outline" size="sm" onClick={handleAnalyzeBuckets} disabled={isRunning}>
-                <BarChart3 className="w-4 h-4 mr-1.5" />
-                Analyze Buckets
-              </Button>
-            </div>
-            {bucketResult && (
-              <div>
-                <p className="text-xs text-text-muted mb-2">
-                  Bucket Analysis ({bucketResult.total_images} images)
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {bucketResult.buckets.map((b, i) => (
-                    <div key={i} className="bg-surface-raised rounded border border-border p-2 text-xs text-text-secondary">
-                      {b.width}×{b.height}: {b.count} images
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </OperationCard>
 
