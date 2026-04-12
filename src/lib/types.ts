@@ -120,6 +120,11 @@ export interface Upscaler {
   url: string | null;
 }
 
+export interface BackgroundRemover {
+  name: string;
+  description: string;
+}
+
 export interface BucketResult {
   buckets: Array<{ width: number; height: number; count: number; images: string[] }>;
   total_images: number;

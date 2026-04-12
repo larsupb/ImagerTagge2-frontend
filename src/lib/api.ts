@@ -8,6 +8,7 @@ import type {
   Tagger,
   TaggersResponse,
   Upscaler,
+  BackgroundRemover,
   BucketResult,
   ProjectOpenResponse,
   ActiveProjectsResponse,
@@ -235,8 +236,8 @@ export const api = {
   saveUpscaled: (index: number) =>
     apiFetch("/api/processing/upscale/save?index=" + index, { method: "POST" }),
 
-  removeBackground: (index: number) =>
-    apiFetch("/api/processing/remove-background?index=" + index, { method: "POST" }),
+  removeBackground: (index: number, model?: string) =>
+    apiFetch("/api/processing/remove-background?index=" + index + (model ? "&model=" + model : ""), { method: "POST" }),
 
   generateMask: (index: number) =>
     apiFetch("/api/processing/mask/generate", {
@@ -368,6 +369,7 @@ export const api = {
   updateSetting: (key: string, value: unknown) =>
     apiFetch("/api/settings/", { method: "PUT", body: JSON.stringify({ key, value }) }),
   getUpscalers: () => apiFetch<Upscaler[]>("/api/settings/upscalers"),
+  getBackgroundRemovers: () => apiFetch<BackgroundRemover[]>("/api/settings/background-removers"),
   getTaggers: () => apiFetch<TaggersResponse>("/api/settings/taggers"),
 
   // PromptGen

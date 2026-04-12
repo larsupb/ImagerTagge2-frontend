@@ -6,6 +6,7 @@ import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeO
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import VersionHistoryDialog from "./VersionHistoryDialog";
+import DropdownButton from "./DropdownButton";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import { Button } from "@/components/ui/button";
@@ -43,10 +44,20 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
     queryFn: () => api.getSettings(),
   });
 
-  const handleUpscale = async () => {
+  const { data: upscalers } = useQuery({
+    queryKey: ["upscalers"],
+    queryFn: () => api.getUpscalers(),
+  });
+
+  const { data: backgroundRemovers } = useQuery({
+    queryKey: ["background-removers"],
+    queryFn: () => api.getBackgroundRemovers(),
+  });
+
+  const handleUpscale = async (upscaler?: string) => {
     setProcessing("upscale");
     try {
-      await api.upscale(index);
+      await api.upscale(index, upscaler);
       await api.saveUpscaled(index);
       onRefresh();
     } catch (e) {
@@ -56,10 +67,10 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
     }
   };
 
-  const handleRemoveBg = async () => {
+  const handleRemoveBg = async (model?: string) => {
     setProcessing("rembg");
     try {
-      await api.removeBackground(index);
+      await api.removeBackground(index, model);
       onRefresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Remove background failed");
@@ -98,11 +109,11 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
     if (setCropMode) setCropMode(!cropMode);
   };
 
-  const handleWhiteBalance = async () => {
+  const handleWhiteBalance = async (method?: string) => {
     setProcessing("white_balance");
     try {
-      const method = settings?.white_balance_method || "gray_world";
-      await api.whiteBalance(index, method);
+      const wbMethod = method || settings?.white_balance_method || "gray_world";
+      await api.whiteBalance(index, wbMethod);
       onRefresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "White balance failed");
@@ -119,31 +130,27 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
         {currentItem?.file_size && ` \u2014 ${(currentItem.file_size / 1024).toFixed(0)}KB`}
       </span>
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handleUpscale}
-          disabled={!!processing}
-        >
-          <ArrowUpCircle className="size-4 text-purple-500" />
-        </TooltipTrigger>
-        <TooltipContent>
-          {processing === "upscale" ? "Upscaling..." : "Upscale"}
-        </TooltipContent>
-      </Tooltip>
+      <DropdownButton
+        icon={<ArrowUpCircle className="size-4" />}
+        iconColor="text-purple-500"
+        label="Upscale"
+        processingLabel={processing === "upscale" ? "Upscaling..." : undefined}
+        processing={!!processing}
+        currentValue={settings?.upscaler || "NMKD_Siax_200k_4x"}
+        options={(upscalers || []).map((u) => ({ value: u.name, label: `${u.name} (${u.scale_factor}x)` }))}
+        onSelect={(value) => handleUpscale(value)}
+      />
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handleRemoveBg}
-          disabled={!!processing}
-        >
-          <Eraser className="size-4 text-teal-500" />
-        </TooltipTrigger>
-        <TooltipContent>
-          {processing === "rembg" ? "Removing..." : "Remove BG"}
-        </TooltipContent>
-      </Tooltip>
+      <DropdownButton
+        icon={<Eraser className="size-4" />}
+        iconColor="text-teal-500"
+        label="Remove BG"
+        processingLabel={processing === "rembg" ? "Removing..." : undefined}
+        processing={!!processing}
+        currentValue={settings?.rembg?.model || "u2net_human_seg"}
+        options={(backgroundRemovers || []).map((b) => ({ value: b.name, label: b.description }))}
+        onSelect={(value) => handleRemoveBg(value)}
+      />
 
       <Tooltip>
         <TooltipTrigger
@@ -194,16 +201,20 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
         <TooltipContent>Crop</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handleWhiteBalance}
-          disabled={!!processing}
-        >
-          <Sun className="size-4 text-yellow-500" />
-        </TooltipTrigger>
-        <TooltipContent>Auto White Balance</TooltipContent>
-      </Tooltip>
+      <DropdownButton
+        icon={<Sun className="size-4" />}
+        iconColor="text-yellow-500"
+        label="White Balance"
+        processingLabel={processing === "white_balance" ? "Balancing..." : undefined}
+        processing={!!processing}
+        currentValue={settings?.white_balance_method || "gray_world"}
+        options={[
+          { value: "gray_world", label: "Gray World" },
+          { value: "shades_of_gray", label: "Shades of Gray" },
+          { value: "gray_edge", label: "Gray Edge" },
+        ]}
+        onSelect={(value) => handleWhiteBalance(value)}
+      />
 
       <div className="flex-1" />
 
