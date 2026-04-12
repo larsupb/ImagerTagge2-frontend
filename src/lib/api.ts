@@ -250,6 +250,13 @@ export const api = {
     });
   },
 
+  whiteBalance: async (index: number, method: string) => {
+    return apiFetch("/api/processing/white-balance", {
+      method: "POST",
+      body: JSON.stringify({ index, method }),
+    });
+  },
+
   getVersions: async (index: number) => {
     return apiFetch<ImageVersion[]>(`/api/processing/versions/${index}`);
   },
