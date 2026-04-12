@@ -179,3 +179,21 @@ export interface ColorMatchMethod {
   id: string;
   name: string;
 }
+
+export interface TaskLogEntry {
+  index: number;
+  filename: string;
+  message: string;
+}
+
+export interface BatchTask {
+  task_id: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  progress: number;
+  current_index: number;
+  total: number;
+  logs: TaskLogEntry[];
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+}

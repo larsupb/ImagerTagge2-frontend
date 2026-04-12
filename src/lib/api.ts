@@ -14,6 +14,7 @@ import type {
   RecentProjectsResponse,
   ImageVersion,
   ColorMatchPreviewResult,
+  BatchTask,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -285,6 +286,33 @@ export const api = {
     });
   },
 
+  startBatchTask: async (options: Record<string, unknown>): Promise<{ task_id: string }> => {
+    const sid = await getSessionId();
+    const response = await fetch("/api/batch/process", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-ID": sid,
+      },
+      body: JSON.stringify(options),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to start batch: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  getTaskStatus: async (taskId: string): Promise<BatchTask> => {
+    const sid = await getSessionId();
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      headers: { "X-Session-ID": sid },
+    });
+    if (!response.ok) {
+      throw new Error(`Task not found: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
   analyzeBuckets: (resolution = 1024, step = 64, maxSteps = 4) =>
     apiFetch<BucketResult>("/api/batch/analyze-buckets", {
       method: "POST",
@@ -335,3 +363,31 @@ export const api = {
   mediaUrl: getMediaUrl,
   thumbnailUrl: getThumbnailUrl,
 };
+
+// Task polling exports
+export async function getTaskStatus(taskId: string): Promise<BatchTask> {
+  const sid = await getSessionId();
+  const response = await fetch(`/api/tasks/${taskId}`, {
+    headers: { "X-Session-ID": sid },
+  });
+  if (!response.ok) {
+    throw new Error(`Task not found: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function startBatchTask(options: Record<string, unknown>): Promise<{ task_id: string }> {
+  const sid = await getSessionId();
+  const response = await fetch("/api/batch/process", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-ID": sid,
+    },
+    body: JSON.stringify(options),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to start batch: ${response.statusText}`);
+  }
+  return response.json();
+}

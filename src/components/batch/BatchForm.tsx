@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, getCurrentSessionId } from "@/lib/api";
-import type { BatchProgress, BucketResult, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem } from "@/lib/types";
+import type { BatchProgress, BucketResult, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem, TaskLogEntry } from "@/lib/types";
+import { useTaskPolling } from "../../hooks/useTaskPolling";
 import ProgressLog from "./ProgressLog";
 import { HoverImage } from "@/components/shared/HoverImage";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ export default function BatchForm() {
   const [step, setStep] = useState(128);
   const [maxSteps, setMaxSteps] = useState(2);
   const [isRunning, setIsRunning] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<BatchProgress[]>([]);
   const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
   const [colorMatch, setColorMatch] = useState(false);
@@ -141,71 +143,64 @@ export default function BatchForm() {
     }
   }, [colorMatch, colorMatchReference]);
 
+  const { task } = useTaskPolling(currentTaskId);
+
+  useEffect(() => {
+    if (task) {
+      if (task.logs && task.logs.length > 0) {
+        setLogEntries(
+          task.logs.map((log: TaskLogEntry) => ({
+            index: log.index,
+            total: task.total,
+            filename: log.filename,
+            progress: (log.index + 1) / task.total,
+            log: log.message,
+          }))
+        );
+      }
+      if (task.status === "completed") {
+        toast.success("Batch processing completed");
+        setIsRunning(false);
+        setCurrentTaskId(null);
+      } else if (task.status === "failed") {
+        toast.error(task.error || "Batch processing failed");
+        setIsRunning(false);
+        setCurrentTaskId(null);
+      } else if (task.status === "cancelled") {
+        toast.info("Batch processing cancelled");
+        setIsRunning(false);
+        setCurrentTaskId(null);
+      }
+    }
+  }, [task]);
+
   const handleStart = async () => {
     setIsRunning(true);
     setLogEntries([]);
     try {
-      const response = await fetch("/api/batch/process", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-ID": getCurrentSessionId() || "",
-        },
-        body: JSON.stringify({
-          rename,
-          rename_offset: renameOffset,
-          upscale,
-          upscaler: batchUpscaler,
-          bucket_resize: bucketResize,
-          mask,
-          caption,
-          tagger,
-          unified_caption: unifiedCaption,
-          caption_type: captionType,
-          bucket_resolution: resolution,
-          bucket_step: step,
-          bucket_max_steps: maxSteps,
-          color_match: colorMatch,
-          color_match_method: colorMatchMethod,
-          color_match_reference: colorMatchReference,
-          white_balance: whiteBalance,
-          white_balance_method: whiteBalanceMethod,
-        }),
+      const result = await api.startBatchTask({
+        rename,
+        rename_offset: renameOffset,
+        upscale,
+        upscaler: batchUpscaler,
+        bucket_resize: bucketResize,
+        mask,
+        caption,
+        tagger,
+        unified_caption: unifiedCaption,
+        caption_type: captionType,
+        bucket_resolution: resolution,
+        bucket_step: step,
+        bucket_max_steps: maxSteps,
+        color_match: colorMatch,
+        color_match_method: colorMatchMethod,
+        color_match_reference: colorMatchReference,
+        white_balance: whiteBalance,
+        white_balance_method: whiteBalanceMethod,
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        const detail = error?.detail
-          ? JSON.stringify(error.detail)
-          : `Batch processing failed (${response.status})`;
-        toast.error(detail);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const text = decoder.decode(value);
-          const lines = text.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.substring(6));
-                if (data.index !== undefined) {
-                  setLogEntries((prev) => [...prev, data as BatchProgress]);
-                }
-              } catch { /* ignore parse errors */ }
-            }
-          }
-        }
-      }
-      toast.success("Batch processing completed");
+      setCurrentTaskId(result.task_id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Batch processing failed");
-    } finally {
+      toast.error(e instanceof Error ? e.message : "Failed to start batch");
       setIsRunning(false);
     }
   };
