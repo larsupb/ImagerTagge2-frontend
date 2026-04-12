@@ -247,6 +247,30 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="White Balance">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Default Method</label>
+          <Select
+            value={localSettings.white_balance_method || "gray_world"}
+            onValueChange={(v) => {
+              if (v) {
+                setLocalSettings({ ...localSettings, white_balance_method: v });
+                save("white_balance_method", v);
+              }
+            }}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gray_world">Gray World</SelectItem>
+              <SelectItem value="shades_of_gray">Shades of Gray</SelectItem>
+              <SelectItem value="gray_edge">Gray Edge</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Section>
+
       <Section title="VLM Endpoint (Image Tagging)">
         <div>
           <label className="block text-sm text-text-secondary mb-1">Base URL</label>
