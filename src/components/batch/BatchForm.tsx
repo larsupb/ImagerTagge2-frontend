@@ -23,6 +23,7 @@ import {
   BarChart3,
   Palette,
   Eye,
+  Sun,
 } from "lucide-react";
 
 interface OperationCardProps {
@@ -94,6 +95,8 @@ export default function BatchForm() {
   const [colorMatchPreview, setColorMatchPreview] = useState<ColorMatchPreviewItem[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [colorMatchHistogram, setColorMatchHistogram] = useState<{ l: number[]; a: number[]; b: number[] } | null>(null);
+  const [whiteBalance, setWhiteBalance] = useState(false);
+  const [whiteBalanceMethod, setWhiteBalanceMethod] = useState("gray_world");
 
   const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
@@ -157,6 +160,8 @@ export default function BatchForm() {
           color_match: colorMatch,
           color_match_method: colorMatchMethod,
           color_match_reference: colorMatchReference,
+          white_balance: whiteBalance,
+          white_balance_method: whiteBalanceMethod,
         }),
       });
 
@@ -220,7 +225,7 @@ export default function BatchForm() {
     }
   };
 
-  const hasAnyOperation = rename || upscale || bucketResize || mask || caption || colorMatch;
+  const hasAnyOperation = rename || upscale || bucketResize || mask || caption || colorMatch || whiteBalance;
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -394,11 +399,39 @@ export default function BatchForm() {
         </OperationCard>
 
         <OperationCard
+          icon={<Sun className="w-5 h-5" />}
+          title="White Balance"
+          description="Automatically correct color temperature before other processing."
+          checked={whiteBalance}
+          onCheckedChange={(checked) => {
+            if (checked) setColorMatch(false);
+            setWhiteBalance(checked);
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-text-secondary">Method</label>
+            <Select value={whiteBalanceMethod} onValueChange={(v) => setWhiteBalanceMethod(v ?? "gray_world")}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gray_world">Gray World</SelectItem>
+                <SelectItem value="shades_of_gray">Shades of Gray</SelectItem>
+                <SelectItem value="gray_edge">Gray Edge</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </OperationCard>
+
+        <OperationCard
           icon={<Palette className="w-5 h-5" />}
           title="Color Matching"
           description="Transfer color distribution from a reference image."
           checked={colorMatch}
-          onCheckedChange={setColorMatch}
+          onCheckedChange={(checked) => {
+            if (checked) setWhiteBalance(false);
+            setColorMatch(checked);
+          }}
         >
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
@@ -436,7 +469,7 @@ export default function BatchForm() {
                   src={api.thumbnailUrl(colorMatchReference)}
                   alt="Reference"
                   previewSrc={api.mediaUrl(colorMatchReference)}
-                  className="w-12 h-12 object-cover rounded border border-border"
+                  className="w-12 h-12 rounded border border-border"
                 />
               )}
             </div>
@@ -499,12 +532,12 @@ export default function BatchForm() {
                         <HoverImage
                           src={`data:image/jpeg;base64,${preview.before}`}
                           alt="Before"
-                          className="w-full h-16 object-cover rounded"
+                          className="w-full h-16 rounded"
                         />
                         <HoverImage
                           src={`data:image/jpeg;base64,${preview.after}`}
                           alt="After"
-                          className="w-full h-16 object-cover rounded"
+                          className="w-full h-16 rounded"
                         />
                       </div>
                     </div>
