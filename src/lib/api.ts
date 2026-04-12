@@ -331,6 +331,34 @@ export const api = {
       body: JSON.stringify({ method, sample_count: sampleCount }),
     }),
 
+  // Export
+  startExportTask: async (options: Record<string, unknown>): Promise<{ task_id: string }> => {
+    const sid = await getSessionId();
+    const response = await fetch("/api/export", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-ID": sid,
+      },
+      body: JSON.stringify(options),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to start export: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  getExportStatus: async (taskId: string): Promise<BatchTask> => {
+    const sid = await getSessionId();
+    const response = await fetch(`/api/export/progress/${taskId}`, {
+      headers: { "X-Session-ID": sid },
+    });
+    if (!response.ok) {
+      throw new Error(`Task not found: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
   // Settings
   getSettings: () => apiFetch<Settings>("/api/settings/"),
   updateSetting: (key: string, value: unknown) =>
