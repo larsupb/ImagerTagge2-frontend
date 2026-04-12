@@ -247,32 +247,32 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="OpenAI-Compatible API">
+      <Section title="VLM Endpoint (Image Tagging)">
         <div>
           <label className="block text-sm text-text-secondary mb-1">Base URL</label>
           <Input
-            value={localSettings.openai_settings.base_url}
+            value={localSettings.vlm_endpoint.base_url}
             onChange={(e) =>
               setLocalSettings({
                 ...localSettings,
-                openai_settings: { ...localSettings.openai_settings, base_url: e.target.value },
+                vlm_endpoint: { ...localSettings.vlm_endpoint, base_url: e.target.value },
               })
             }
-            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+            onBlur={() => save("vlm_endpoint", localSettings.vlm_endpoint)}
           />
         </div>
 
         <div>
           <label className="block text-sm text-text-secondary mb-1">Model</label>
           <Input
-            value={localSettings.openai_settings.model}
+            value={localSettings.vlm_endpoint.model}
             onChange={(e) =>
               setLocalSettings({
                 ...localSettings,
-                openai_settings: { ...localSettings.openai_settings, model: e.target.value },
+                vlm_endpoint: { ...localSettings.vlm_endpoint, model: e.target.value },
               })
             }
-            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+            onBlur={() => save("vlm_endpoint", localSettings.vlm_endpoint)}
           />
         </div>
 
@@ -280,28 +280,28 @@ export default function SettingsPage() {
           <label className="block text-sm text-text-secondary mb-1">API Key</label>
           <Input
             type="password"
-            value={localSettings.openai_settings.api_key}
+            value={localSettings.vlm_endpoint.api_key}
             onChange={(e) =>
               setLocalSettings({
                 ...localSettings,
-                openai_settings: { ...localSettings.openai_settings, api_key: e.target.value },
+                vlm_endpoint: { ...localSettings.vlm_endpoint, api_key: e.target.value },
               })
             }
-            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+            onBlur={() => save("vlm_endpoint", localSettings.vlm_endpoint)}
           />
         </div>
 
         <div>
           <label className="block text-sm text-text-secondary mb-1">Prompt</label>
           <textarea
-            value={localSettings.openai_settings.prompt}
+            value={localSettings.vlm_endpoint.prompt}
             onChange={(e) =>
               setLocalSettings({
                 ...localSettings,
-                openai_settings: { ...localSettings.openai_settings, prompt: e.target.value },
+                vlm_endpoint: { ...localSettings.vlm_endpoint, prompt: e.target.value },
               })
             }
-            onBlur={() => save("openai_settings", localSettings.openai_settings)}
+            onBlur={() => save("vlm_endpoint", localSettings.vlm_endpoint)}
             rows={2}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text resize-y focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
           />

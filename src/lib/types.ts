@@ -88,7 +88,7 @@ export interface Settings {
   combo_taggers: string[];
   florence_settings: { prompt: string };
   rembg: { model: string };
-  openai_settings: {
+  vlm_endpoint: {
     api_key: string;
     base_url: string;
     model: string;
