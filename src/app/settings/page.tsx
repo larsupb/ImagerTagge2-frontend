@@ -356,18 +356,7 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Paths">
-        <div>
-          <label className="block text-sm text-text-secondary mb-1">Models Directory</label>
-          <Input
-            value={localSettings.models_dir}
-            onChange={(e) =>
-              setLocalSettings({ ...localSettings, models_dir: e.target.value })
-            }
-            onBlur={() => save("models_dir", localSettings.models_dir)}
-          />
-        </div>
-      </Section>
+
     </div>
   );
 }

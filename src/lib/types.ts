@@ -80,7 +80,6 @@ export interface BatchProgress {
 }
 
 export interface Settings {
-  models_dir: string;
   ignore_list: string[];
   upscaler: string;
   upscale_target_megapixels: number;
