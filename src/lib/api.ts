@@ -366,9 +366,6 @@ export const api = {
   getUpscalers: () => apiFetch<Upscaler[]>("/api/settings/upscalers"),
   getTaggers: () => apiFetch<TaggersResponse>("/api/settings/taggers"),
 
-  // Validation
-  validate: () => apiFetch("/api/settings/validation"),
-
   // PromptGen
   generatePrompt: (captionType: string, exampleCount: number, userPrompt: string) =>
     apiFetch<{ prompt: string }>("/api/promptgen/generate", {
