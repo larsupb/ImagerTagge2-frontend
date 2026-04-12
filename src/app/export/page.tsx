@@ -1,9 +1,9 @@
 "use client";
 
-import { useProjectStore } from "@/store/projectStore";
-import { useSessionStore } from "@/store/session";
-import EmptyState from "@/components/shared/EmptyState";
-import ExportForm from "@/components/export/ExportForm";
+import { useProjectStore } from "../../stores/projectStore";
+import { useSessionStore } from "../../stores/session";
+import EmptyState from "../../components/shared/EmptyState";
+import ExportForm from "../../components/export/ExportForm";
 import { FolderOpen } from "lucide-react";
 
 export default function ExportPage() {
