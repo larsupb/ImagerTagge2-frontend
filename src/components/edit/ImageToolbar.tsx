@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop, Sun } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop, Sun, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import VersionHistoryDialog from "./VersionHistoryDialog";
@@ -38,6 +38,51 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const currentItem = session?.currentItem;
+  const queryClient = useQueryClient();
+
+  const { data: versions } = useQuery({
+    queryKey: ["versions", index],
+    queryFn: () => api.getVersions(index),
+    staleTime: 0,
+  });
+
+const revertMutation = useMutation({
+    mutationFn: async () => {
+      const allVersions = await api.getVersions(index);
+      if (!allVersions || allVersions.length === 0) {
+        throw new Error("No version available to revert");
+      }
+      const latestVersion = allVersions[0];
+      await api.restoreVersion(latestVersion.id, index);
+    },
+    onSuccess: () => {
+      toast.success("Reverted to previous version");
+      onRefresh();
+      queryClient.invalidateQueries({ queryKey: ["versions", index] });
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : "Revert failed");
+    },
+  });
+
+  const redoMutation = useMutation({
+    mutationFn: async () => {
+      const allVersions = await api.getVersions(index);
+      if (!allVersions || allVersions.length < 2) {
+        throw new Error("No version available to redo");
+      }
+      const olderVersion = allVersions[1];
+      await api.restoreVersion(olderVersion.id, index);
+    },
+    onSuccess: () => {
+      toast.success("Redone - restored earlier version");
+      onRefresh();
+      queryClient.invalidateQueries({ queryKey: ["versions", index] });
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : "Redo failed");
+    },
+  });
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
@@ -190,7 +235,7 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
         <TooltipContent>Version History</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
+<Tooltip>
         <TooltipTrigger
           className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           onClick={handleCrop}
@@ -230,15 +275,39 @@ export default function ImageToolbar({ index, onRefresh, processing, setProcessi
           <Button size="xs" variant="secondary" onClick={() => setRenaming(false)}>Cancel</Button>
         </div>
       ) : (
-        <Tooltip>
-          <TooltipTrigger
-            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-            onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}
-          >
-            <Pencil className="size-4" />
-          </TooltipTrigger>
-          <TooltipContent>Rename</TooltipContent>
-        </Tooltip>
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+              onClick={() => revertMutation.mutate()}
+              disabled={!versions || versions.length === 0 || revertMutation.isPending}
+            >
+              <RotateCcw className={`size-4 ${revertMutation.isPending ? "animate-spin" : "text-indigo-500"}`} />
+            </TooltipTrigger>
+            <TooltipContent>{versions && versions.length > 0 ? "Revert to Previous" : "No version to revert"}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+              onClick={() => redoMutation.mutate()}
+              disabled={!versions || versions.length < 2 || redoMutation.isPending}
+            >
+              <RotateCcw className={`size-4 ${redoMutation.isPending ? "animate-spin" : "text-violet-500"} scale-x-[-1]`} />
+            </TooltipTrigger>
+            <TooltipContent>{versions && versions.length >= 2 ? "Redo (earlier version)" : "No version to redo"}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+              onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}
+            >
+              <Pencil className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Rename</TooltipContent>
+          </Tooltip>
+        </>
       )}
 
       <Tooltip>
