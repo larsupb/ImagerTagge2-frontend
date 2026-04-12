@@ -89,11 +89,11 @@ export default function CaptionEditor({
       const currentTypeExists = captions.some((c) => c.caption_type === activeType);
       if (!currentTypeExists) {
         const active = captions.find((c) => c.is_active);
-        setActiveType(active?.caption_type ?? "tag");
+        setActiveType(active?.caption_type ?? captions[0]?.caption_type ?? "")
       }
     } else {
       setSavedContent({});
-      setActiveType("tag");
+      setActiveType("");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [captions]);
