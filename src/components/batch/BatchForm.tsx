@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, getCurrentSessionId } from "@/lib/api";
-import type { BatchProgress, BucketResult, Upscaler, Tagger } from "@/lib/types";
+import type { BatchProgress, BucketResult, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem } from "@/lib/types";
 import ProgressLog from "./ProgressLog";
+import { HoverImage } from "@/components/shared/HoverImage";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,8 @@ import {
   ChevronUp,
   Play,
   BarChart3,
+  Palette,
+  Eye,
 } from "lucide-react";
 
 interface OperationCardProps {
@@ -85,6 +88,12 @@ export default function BatchForm() {
   const [isRunning, setIsRunning] = useState(false);
   const [logEntries, setLogEntries] = useState<BatchProgress[]>([]);
   const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
+  const [colorMatch, setColorMatch] = useState(false);
+  const [colorMatchMethod, setColorMatchMethod] = useState("histogram");
+  const [colorMatchReference, setColorMatchReference] = useState(0);
+  const [colorMatchPreview, setColorMatchPreview] = useState<ColorMatchPreviewItem[]>([]);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [colorMatchHistogram, setColorMatchHistogram] = useState<{ l: number[]; a: number[]; b: number[] } | null>(null);
 
   const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
@@ -100,6 +109,26 @@ export default function BatchForm() {
     queryKey: ["settings"],
     queryFn: () => api.getSettings(),
   });
+
+  const { data: datasetInfo } = useQuery({
+    queryKey: ["datasetInfo"],
+    queryFn: () => api.getDatasetInfo(),
+  });
+
+  const { data: galleryItems } = useQuery({
+    queryKey: ["galleryItems"],
+    queryFn: () => api.getGallery(0, 100).then((r) => r.items),
+  });
+
+  useEffect(() => {
+    if (colorMatch && colorMatchReference >= 0) {
+      api.getHistogram(colorMatchReference)
+        .then(setColorMatchHistogram)
+        .catch(() => setColorMatchHistogram(null));
+    } else {
+      setColorMatchHistogram(null);
+    }
+  }, [colorMatch, colorMatchReference]);
 
   const handleStart = async () => {
     setIsRunning(true);
@@ -125,6 +154,9 @@ export default function BatchForm() {
           bucket_resolution: resolution,
           bucket_step: step,
           bucket_max_steps: maxSteps,
+          color_match: colorMatch,
+          color_match_method: colorMatchMethod,
+          color_match_reference: colorMatchReference,
         }),
       });
 
@@ -175,7 +207,20 @@ export default function BatchForm() {
     }
   };
 
-  const hasAnyOperation = rename || upscale || bucketResize || mask || caption;
+  const handleColorMatchPreview = async () => {
+    setIsPreviewing(true);
+    setColorMatchPreview([]);
+    try {
+      const result = await api.previewColorMatch(colorMatchMethod, colorMatchReference, 4);
+      setColorMatchPreview(result.previews);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Preview failed");
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const hasAnyOperation = rename || upscale || bucketResize || mask || caption || colorMatch;
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -345,6 +390,128 @@ export default function BatchForm() {
                 className="w-48"
               />
             </div>
+          </div>
+        </OperationCard>
+
+        <OperationCard
+          icon={<Palette className="w-5 h-5" />}
+          title="Color Matching"
+          description="Transfer color distribution from a reference image."
+          checked={colorMatch}
+          onCheckedChange={setColorMatch}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-text-secondary">Method</label>
+              <Select value={colorMatchMethod} onValueChange={(v) => setColorMatchMethod(v ?? "histogram")}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="histogram">LAB</SelectItem>
+                  <SelectItem value="wavelet">Wavelet</SelectItem>
+                  <SelectItem value="pca">PCA</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-text-secondary">Reference</label>
+              <Select
+                value={String(colorMatchReference)}
+                onValueChange={(v) => setColorMatchReference(Number(v) || 0)}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select image" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: Math.min(datasetInfo?.total_items || 0, 100) }, (_, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      {i} - {galleryItems?.[i]?.filename || `image_${i}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {colorMatchReference >= 0 && (
+                <HoverImage
+                  src={api.thumbnailUrl(colorMatchReference)}
+                  alt="Reference"
+                  previewSrc={api.mediaUrl(colorMatchReference)}
+                  className="w-12 h-12 object-cover rounded border border-border"
+                />
+              )}
+            </div>
+            {colorMatchHistogram && (
+              <div className="mt-2">
+                <p className="text-xs text-text-muted mb-1">Reference LAB Histogram</p>
+                <div className="flex gap-1 h-16">
+                  <div className="flex-1 flex items-end gap-px">
+                    {colorMatchHistogram.l.slice(0, 32).map((v, i) => (
+                      <div
+                        key={`l-${i}`}
+                        className="flex-1 bg-gray-300"
+                        style={{ height: `${(v / Math.max(...colorMatchHistogram.l)) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex-1 flex items-end gap-px">
+                    {colorMatchHistogram.a.slice(0, 32).map((v, i) => (
+                      <div
+                        key={`a-${i}`}
+                        className="flex-1 bg-green-400"
+                        style={{ height: `${(v / Math.max(...colorMatchHistogram.a.filter(x => x > 0), 1)) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex-1 flex items-end gap-px">
+                    {colorMatchHistogram.b.slice(0, 32).map((v, i) => (
+                      <div
+                        key={`b-${i}`}
+                        className="flex-1 bg-blue-400"
+                        style={{ height: `${(v / Math.max(...colorMatchHistogram.b.filter(x => x > 0), 1)) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-1 mt-1 text-xs text-text-muted">
+                  <span className="flex-1 text-center">L</span>
+                  <span className="flex-1 text-center">a</span>
+                  <span className="flex-1 text-center">b</span>
+                </div>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleColorMatchPreview}
+              disabled={isPreviewing || !colorMatch}
+            >
+              <Eye className="w-4 h-4 mr-1.5" />
+              {isPreviewing ? "Previewing..." : "Preview"}
+            </Button>
+            {colorMatchPreview.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-text-muted mb-2">Preview Results</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {colorMatchPreview.map((preview) => (
+                    <div key={preview.index} className="flex flex-col gap-1">
+                      <div className="text-xs text-text-secondary truncate">{preview.filename}</div>
+                      <div className="flex gap-0.5">
+                        <HoverImage
+                          src={`data:image/jpeg;base64,${preview.before}`}
+                          alt="Before"
+                          className="w-full h-16 object-cover rounded"
+                        />
+                        <HoverImage
+                          src={`data:image/jpeg;base64,${preview.after}`}
+                          alt="After"
+                          className="w-full h-16 object-cover rounded"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </OperationCard>
       </div>

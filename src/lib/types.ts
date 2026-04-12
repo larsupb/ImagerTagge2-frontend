@@ -162,3 +162,19 @@ export interface ActiveProjectsResponse {
 export interface RecentProjectsResponse {
   projects: RecentProject[];
 }
+
+export interface ColorMatchPreviewItem {
+  index: number;
+  filename: string;
+  before: string;
+  after: string;
+}
+
+export interface ColorMatchPreviewResult {
+  previews: ColorMatchPreviewItem[];
+}
+
+export interface ColorMatchMethod {
+  id: string;
+  name: string;
+}

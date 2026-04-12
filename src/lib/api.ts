@@ -13,7 +13,10 @@ import type {
   ActiveProjectsResponse,
   RecentProjectsResponse,
   ImageVersion,
+  ColorMatchPreviewResult,
 } from "./types";
+import { toast } from "sonner";
+import { useProjectStore } from "@/stores/projectStore";
 
 let sessionId: string | null = null;
 
@@ -23,6 +26,11 @@ export function setSessionId(id: string | null) {
 
 export function getCurrentSessionId(): string | null {
   return sessionId;
+}
+
+function clearSession() {
+  sessionId = null;
+  useProjectStore.getState().reset();
 }
 
 export async function getSessionId(): Promise<string> {
@@ -55,6 +63,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       ...options.headers,
     },
   });
+  if (res.status === 401) {
+    toast.warning("Session expired, please open your project again");
+    clearSession();
+    window.location.href = "/browse";
+    throw new Error("Session expired");
+  }
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail || "API error");
@@ -108,6 +122,11 @@ export const api = {
     }),
 
   getItem: (index: number) => apiFetch<MediaItem>(`/api/dataset/item/${index}`),
+
+  getDatasetInfo: () => apiFetch<DatasetInfo>("/api/dataset/info"),
+
+  getHistogram: (index: number) =>
+    apiFetch<{ l: number[]; a: number[]; b: number[] }>(`/api/dataset/histogram/${index}`),
 
   getGallery: (page = 0, pageSize = 50) =>
     apiFetch<GalleryResponse>(`/api/dataset/gallery?page=${page}&page_size=${pageSize}`),
@@ -256,6 +275,12 @@ export const api = {
     apiFetch<BucketResult>("/api/batch/analyze-buckets", {
       method: "POST",
       body: JSON.stringify({ resolution, step, max_steps: maxSteps }),
+    }),
+
+  previewColorMatch: (method: string, reference: number, sampleCount = 4) =>
+    apiFetch<ColorMatchPreviewResult>("/api/batch/preview-color-match", {
+      method: "POST",
+      body: JSON.stringify({ method, reference, sample_count: sampleCount }),
     }),
 
   // Settings
