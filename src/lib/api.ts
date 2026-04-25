@@ -250,6 +250,12 @@ export const api = {
       body: JSON.stringify({ category }),
     }),
 
+  setBulkCategory: (indices: number[], category: string | null) =>
+    apiFetch<{ updated: number; category: string | null }>("/api/categories/bulk", {
+      method: "POST",
+      body: JSON.stringify({ indices, category }),
+    }),
+
   renameCategory: (oldName: string, newName: string) =>
     apiFetch("/api/categories/rename", {
       method: "POST",

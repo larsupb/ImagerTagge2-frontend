@@ -3,14 +3,32 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight } from "lucide-react";
 import { api, getThumbnailUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import type { GalleryItem } from "@/lib/types";
+
+const NONE = "__none__";
+const NEW = "__new__";
 
 function getIssues(item: GalleryItem): string[] {
   const issues: string[] = [];
@@ -23,41 +41,22 @@ function getIssues(item: GalleryItem): string[] {
 
 function GalleryThumbnail({
   item,
-  onClick,
+  isSelected,
+  onToggleSelect,
+  onEdit,
 }: {
   item: GalleryItem;
-  onClick: (item: GalleryItem) => void;
+  isSelected: boolean;
+  onToggleSelect: (index: number) => void;
+  onEdit: (item: GalleryItem) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
 
-  const thumbnail = (
-    <div
-      className={`group relative aspect-square rounded-lg border overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised ${
-        hasIssues ? "border-danger" : "border-border"
-      }`}
-    >
-      <img
-        src={getThumbnailUrl(item.index)}
-        alt={item.filename}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-      {item.is_bookmarked && (
-        <span className="absolute top-1.5 right-1.5 text-yellow-400">
-          <Star className="w-3.5 h-3.5 fill-current" />
-        </span>
-      )}
-      {hasIssues && (
-        <span className="absolute top-1.5 left-1.5 text-danger">
-          <AlertTriangle className="w-3.5 h-3.5" />
-        </span>
-      )}
-      <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-zinc-300 truncate opacity-0 group-hover:opacity-100 transition-opacity">
-        {item.filename}
-      </div>
-    </div>
-  );
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(item);
+  };
 
   return (
     <Tooltip>
@@ -65,13 +64,47 @@ function GalleryThumbnail({
         <div
           role="button"
           tabIndex={0}
-          onClick={() => onClick(item)}
+          onClick={() => onToggleSelect(item.index)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onClick(item);
+            if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index);
           }}
-          className="cursor-pointer"
+          className={`group relative aspect-square rounded-lg overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised cursor-pointer select-none ${
+            isSelected
+              ? "ring-3 ring-blue-500 border-2 border-blue-500"
+              : hasIssues
+              ? "border border-danger"
+              : "border border-border"
+          }`}
         >
-          {thumbnail}
+          <img
+            src={getThumbnailUrl(item.index)}
+            alt={item.filename}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+
+          {isSelected && (
+            <div className="absolute inset-0 bg-blue-500/40 pointer-events-none" />
+          )}
+
+          {hasIssues && (
+            <span className="absolute top-1.5 left-1.5 text-danger">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </span>
+          )}
+          {item.is_bookmarked && (
+            <span className="absolute top-1.5 right-1.5 text-yellow-400">
+              <Star className="w-3.5 h-3.5 fill-current" />
+            </span>
+          )}
+
+          <div
+            className="absolute bottom-0 inset-x-0 bg-black/70 px-2 py-1.5 flex items-center justify-center gap-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            onClick={handleEditClick}
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </div>
         </div>
       </TooltipTrigger>
       {hasIssues && (
@@ -91,30 +124,163 @@ function CategorySection({
   name,
   items,
   showHeader,
-  onItemClick,
+  selectedIndices,
+  onToggleSelect,
+  onEdit,
 }: {
   name: string | null;
   items: GalleryItem[];
   showHeader: boolean;
-  onItemClick: (item: GalleryItem) => void;
+  selectedIndices: Set<number>;
+  onToggleSelect: (index: number) => void;
+  onEdit: (item: GalleryItem) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div>
       {showHeader && (
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-sm font-semibold text-text">
+        <button
+          className="flex items-center gap-2 mb-3 w-full text-left group/header"
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <ChevronRight
+            className={`w-3.5 h-3.5 text-text-secondary transition-transform duration-150 ${
+              collapsed ? "" : "rotate-90"
+            }`}
+          />
+          <h2 className="text-sm font-semibold text-text group-hover/header:text-text-secondary transition-colors">
             {name ?? "Uncategorized"}
           </h2>
           <span className="text-xs text-text-secondary">{items.length}</span>
           <div className="flex-1 h-px bg-border" />
+        </button>
+      )}
+      {!collapsed && (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+          {items.map((item) => (
+            <GalleryThumbnail
+              key={item.index}
+              item={item}
+              isSelected={selectedIndices.has(item.index)}
+              onToggleSelect={onToggleSelect}
+              onEdit={onEdit}
+            />
+          ))}
         </div>
       )}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-        {items.map((item) => (
-          <GalleryThumbnail key={item.index} item={item} onClick={onItemClick} />
-        ))}
-      </div>
     </div>
+  );
+}
+
+function BatchCategoryAssign({
+  selectedIndices,
+  onDone,
+}: {
+  selectedIndices: Set<number>;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [newOpen, setNewOpen] = useState(false);
+  const [newInput, setNewInput] = useState("");
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => api.getCategories(),
+  });
+
+  const assign = async (category: string | null) => {
+    try {
+      const indices = Array.from(selectedIndices);
+      await api.setBulkCategory(indices, category);
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success(
+        category
+          ? `Assigned ${indices.length} image${indices.length > 1 ? "s" : ""} to "${category}"`
+          : `Removed category from ${indices.length} image${indices.length > 1 ? "s" : ""}`
+      );
+      setPopoverOpen(false);
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign category");
+    }
+  };
+
+  const handleSelect = (value: string | null) => {
+    if (!value) return;
+    if (value === NEW) {
+      setNewInput("");
+      setNewOpen(true);
+      return;
+    }
+    assign(value === NONE ? null : value);
+  };
+
+  const handleCreate = async () => {
+    const name = newInput.trim();
+    if (!name) return;
+    setNewOpen(false);
+    setNewInput("");
+    await assign(name);
+  };
+
+  return (
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Tag className="w-3.5 h-3.5" />
+          Assign category
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="end">
+        {newOpen ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-text-secondary px-1">New category name</p>
+            <Input
+              placeholder="Category name..."
+              value={newInput}
+              onChange={(e) => setNewInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate} className="flex-1">
+                Create & assign
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setNewOpen(false)}>
+                Back
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Select onValueChange={handleSelect}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select category..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>
+                <span className="text-text-muted">No category</span>
+              </SelectItem>
+              {categories.length > 0 && <SelectSeparator />}
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+              <SelectSeparator />
+              <SelectItem value={NEW}>
+                <div className="flex items-center gap-1">
+                  <Plus className="w-3 h-3" />
+                  New category...
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -127,6 +293,7 @@ export default function GalleryGrid() {
   const queryClient = useQueryClient();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const dragCounter = useRef(0);
 
   const total = session?.datasetInfo?.total_items ?? 0;
@@ -155,7 +322,31 @@ export default function GalleryGrid() {
 
   const hasCategories = grouped.some(([cat]) => cat !== null);
 
-  const handleClick = (item: GalleryItem) => {
+  const allIndices = useMemo(
+    () => data?.items.map((i) => i.index) ?? [],
+    [data?.items]
+  );
+
+  const toggleSelect = useCallback((index: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIndices(new Set());
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIndices((prev) =>
+      prev.size === allIndices.length ? new Set() : new Set(allIndices)
+    );
+  }, [allIndices]);
+
+  const handleEdit = (item: GalleryItem) => {
     if (activeProjectId) {
       useSessionStore.getState().setCurrentIndex(activeProjectId, item.index);
     }
@@ -224,6 +415,9 @@ export default function GalleryGrid() {
     return null;
   }
 
+  const selectionCount = selectedIndices.size;
+  const allSelected = allIndices.length > 0 && selectionCount === allIndices.length;
+
   return (
     <div
       onDragEnter={handleDragEnter}
@@ -241,7 +435,41 @@ export default function GalleryGrid() {
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-text-secondary">{total} images</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-text-secondary">{total} images</span>
+          {selectionCount > 0 && (
+            <>
+              <span className="text-text-muted text-sm">·</span>
+              <span className="text-sm font-medium">{selectionCount} selected</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={clearSelection}
+              >
+                Deselect all
+              </Button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {selectionCount > 0 && (
+            <BatchCategoryAssign
+              selectedIndices={selectedIndices}
+              onDone={clearSelection}
+            />
+          )}
+          {total > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={toggleSelectAll}
+            >
+              {allSelected ? "Deselect all" : "Select all"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -261,7 +489,9 @@ export default function GalleryGrid() {
               name={category}
               items={items}
               showHeader={hasCategories}
-              onItemClick={handleClick}
+              selectedIndices={selectedIndices}
+              onToggleSelect={toggleSelect}
+              onEdit={handleEdit}
             />
           ))}
         </div>
