@@ -37,6 +37,7 @@ export interface MediaItem {
   thumbnail_url: string;
   caption: string;
   captions: CaptionEntry[];
+  category: string | null;
 }
 
 export interface GalleryItem {
@@ -47,6 +48,7 @@ export interface GalleryItem {
   has_caption: boolean;
   width: number | null;
   height: number | null;
+  category: string | null;
 }
 
 export interface GalleryResponse {

@@ -139,6 +139,28 @@ export const api = {
   deleteItem: (index: number) =>
     apiFetch<{ total_items: number }>(`/api/dataset/item/${index}`, { method: "DELETE" }),
 
+  uploadImages: async (files: File[]): Promise<{ added: Array<{ index: number; filename: string }>; total_items: number }> => {
+    const sid = await getSessionId();
+    const formData = new FormData();
+    files.forEach((f) => formData.append("files", f));
+    const res = await fetch("/api/dataset/upload", {
+      method: "POST",
+      headers: { "X-Session-ID": sid },
+      body: formData,
+    });
+    if (res.status === 401) {
+      toast.warning("Session expired, please open your project again");
+      clearSession();
+      window.location.href = "/browse";
+      throw new Error("Session expired");
+    }
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(error.detail || "Upload failed");
+    }
+    return res.json();
+  },
+
   renameItem: (index: number, newName: string) =>
     apiFetch<MediaItem>(`/api/dataset/item/${index}/rename?new_name=${encodeURIComponent(newName)}`, {
       method: "PUT",
@@ -218,6 +240,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ tags, inverse, subdirectory_name: subdirectoryName, caption_type: captionType }),
     }),
+
+  // Categories
+  getCategories: () => apiFetch<string[]>("/api/categories/"),
+
+  setCategory: (index: number, category: string | null) =>
+    apiFetch<{ category: string | null }>(`/api/categories/item/${index}`, {
+      method: "PUT",
+      body: JSON.stringify({ category }),
+    }),
+
+  renameCategory: (oldName: string, newName: string) =>
+    apiFetch("/api/categories/rename", {
+      method: "POST",
+      body: JSON.stringify({ old_name: oldName, new_name: newName }),
+    }),
+
+  deleteCategory: (name: string) =>
+    apiFetch(`/api/categories/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
   // Tagging
   generateCaption: (index: number, tagger: string) =>

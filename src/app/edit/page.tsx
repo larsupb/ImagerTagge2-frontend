@@ -11,6 +11,7 @@ import ImageViewer from "@/components/edit/ImageViewer";
 import VideoPlayer from "@/components/edit/VideoPlayer";
 import NavigationBar from "@/components/edit/NavigationBar";
 import CaptionEditor from "@/components/edit/CaptionEditor";
+import CategorySelector from "@/components/edit/CategorySelector";
 import ImageToolbar from "@/components/edit/ImageToolbar";
 import {
   Dialog,
@@ -172,6 +173,14 @@ export default function EditPage() {
           />
         )}
       </div>
+
+      <CategorySelector
+        index={safeIndex}
+        category={currentItem.category}
+        onCategoryChange={(category) => {
+          setCurrentItem(activeProjectId, { ...currentItem, category });
+        }}
+      />
 
       <CaptionEditor
         caption={currentItem.caption}

@@ -139,7 +139,14 @@ const revertMutation = useMutation({
 
   const handleDelete = async () => {
     setConfirmDelete(false);
-    await api.deleteItem(index);
+    const result = await api.deleteItem(index);
+    if (activeProjectId && session?.datasetInfo) {
+      useSessionStore.getState().setDatasetInfo(activeProjectId, {
+        ...session.datasetInfo,
+        total_items: result.total_items,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["gallery"] });
     onRefresh();
   };
 
