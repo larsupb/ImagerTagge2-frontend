@@ -53,7 +53,7 @@ function getIssues(item: GalleryItem): string[] {
 function GalleryThumbnail({
   item,
   isSelected,
-  thumbVersion,
+  thumbDeleteState,
   categories,
   onToggleSelect,
   onPreview,
@@ -63,7 +63,7 @@ function GalleryThumbnail({
 }: {
   item: GalleryItem;
   isSelected: boolean;
-  thumbVersion: number;
+  thumbDeleteState: { v: number; fromIndex: number } | null;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
@@ -118,7 +118,7 @@ function GalleryThumbnail({
               }`}
             >
               <img
-                src={`${getThumbnailUrl(item.index)}${thumbVersion > 0 ? `&v=${thumbVersion}` : ""}`}
+                src={`${getThumbnailUrl(item.index)}${thumbDeleteState && item.index >= thumbDeleteState.fromIndex ? `&v=${thumbDeleteState.v}` : ""}`}
                 alt={item.filename}
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -200,7 +200,7 @@ function CategorySection({
   collapsed,
   onToggleCollapse,
   selectedIndices,
-  thumbVersion,
+  thumbDeleteState,
   categories,
   onToggleSelect,
   onPreview,
@@ -215,7 +215,7 @@ function CategorySection({
   collapsed: boolean;
   onToggleCollapse: () => void;
   selectedIndices: Set<number>;
-  thumbVersion: number;
+  thumbDeleteState: { v: number; fromIndex: number } | null;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
@@ -286,7 +286,7 @@ function CategorySection({
               key={item.index}
               item={item}
               isSelected={selectedIndices.has(item.index)}
-              thumbVersion={thumbVersion}
+              thumbDeleteState={thumbDeleteState}
               categories={categories}
               onToggleSelect={onToggleSelect}
               onPreview={onPreview}
@@ -560,7 +560,7 @@ export default function GalleryGrid() {
   const queryClient = useQueryClient();
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [pendingDeleteItem, setPendingDeleteItem] = useState<GalleryItem | null>(null);
-  const [thumbVersion, setThumbVersion] = useState(0);
+  const thumbDeleteRef = useRef<{ v: number; fromIndex: number } | null>(null);
   const [previewState, setPreviewState] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   const lastSelectedRef = useRef<number | null>(null);
 
@@ -662,28 +662,31 @@ export default function GalleryGrid() {
     setPendingDeleteItem(null);
     try {
       const result = await api.deleteItem(item.index);
+      const newTotal = result.total_items;
 
-      queryClient.setQueryData<GalleryResponse>(["gallery", "all"], (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items
-            .filter((i) => i.index !== item.index)
-            .map((i) => (i.index > item.index ? { ...i, index: i.index - 1 } : i)),
-          total: result.total_items,
-          page_size: result.total_items,
-        };
+      const updatedItems = (data?.items ?? [])
+        .filter((i) => i.index !== item.index)
+        .map((i) => (i.index > item.index ? { ...i, index: i.index - 1 } : i));
+
+      // Update ref synchronously before any render is triggered, so the &v= param
+      // is already in place when the data change causes the first re-render.
+      thumbDeleteRef.current = { v: (thumbDeleteRef.current?.v ?? 0) + 1, fromIndex: item.index };
+
+      queryClient.setQueryData<GalleryResponse>(["gallery", "all", newTotal], {
+        items: updatedItems,
+        total: newTotal,
+        page: 0,
+        page_size: newTotal,
       });
-
-      setThumbVersion((v) => v + 1);
-      queryClient.invalidateQueries({ queryKey: ["gallery"] });
 
       if (activeProjectId && session?.datasetInfo) {
         useSessionStore.getState().setDatasetInfo(activeProjectId, {
           ...session.datasetInfo,
-          total_items: result.total_items,
+          total_items: newTotal,
         });
       }
+
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
 
       setSelectedIndices((prev) => {
         const next = new Set(prev);
@@ -693,7 +696,7 @@ export default function GalleryGrid() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
     }
-  }, [pendingDeleteItem, activeProjectId, session, queryClient]);
+  }, [pendingDeleteItem, activeProjectId, session, queryClient, data?.items]);
 
   const collapsedCategories = session?.collapsedCategories ?? new Set<string>();
 
@@ -815,7 +818,7 @@ export default function GalleryGrid() {
                 collapsed={hasCategories && collapsedCategories.has(categoryKey)}
                 onToggleCollapse={() => handleToggleCollapse(categoryKey)}
                 selectedIndices={selectedIndices}
-                thumbVersion={thumbVersion}
+                thumbDeleteState={thumbDeleteRef.current}
                 categories={categoryNames}
                 onToggleSelect={toggleSelect}
                 onPreview={handlePreview}
