@@ -7,6 +7,7 @@ interface PerProjectSession {
   currentItem: MediaItem | null;
   isLoading: boolean;
   error: string | null;
+  collapsedCategories: Set<string>;
 }
 
 interface SessionState {
@@ -19,6 +20,7 @@ interface SessionState {
   setLoading: (projectId: string, loading: boolean) => void;
   setError: (projectId: string, error: string | null) => void;
   clearProjectSession: (projectId: string) => void;
+  toggleCategoryCollapsed: (projectId: string, categoryKey: string) => void;
 }
 
 const defaultSession = (): PerProjectSession => ({
@@ -27,6 +29,7 @@ const defaultSession = (): PerProjectSession => ({
   currentItem: null,
   isLoading: false,
   error: null,
+  collapsedCategories: new Set<string>(),
 });
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -89,6 +92,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((state) => {
       const next = new Map(state.sessions);
       next.delete(projectId);
+      return { sessions: next };
+    }),
+
+  toggleCategoryCollapsed: (projectId, categoryKey) =>
+    set((state) => {
+      const next = new Map(state.sessions);
+      const session = next.get(projectId) || defaultSession();
+      const collapsed = new Set(session.collapsedCategories);
+      if (collapsed.has(categoryKey)) {
+        collapsed.delete(categoryKey);
+      } else {
+        collapsed.add(categoryKey);
+      }
+      next.set(projectId, { ...session, collapsedCategories: collapsed });
       return { sessions: next };
     }),
 }));

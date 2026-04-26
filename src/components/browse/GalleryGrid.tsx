@@ -160,6 +160,8 @@ function CategorySection({
   name,
   items,
   showHeader,
+  collapsed,
+  onToggleCollapse,
   selectedIndices,
   thumbVersion,
   onToggleSelect,
@@ -171,6 +173,8 @@ function CategorySection({
   name: string | null;
   items: GalleryItem[];
   showHeader: boolean;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   selectedIndices: Set<number>;
   thumbVersion: number;
   onToggleSelect: (index: number, shiftKey: boolean) => void;
@@ -179,7 +183,6 @@ function CategorySection({
   onDelete: (item: GalleryItem) => void;
   onCategoryDrop: (index: number, category: string | null) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -221,7 +224,7 @@ function CategorySection({
       {showHeader && (
         <button
           className="flex items-center gap-2 mb-3 w-full text-left group/header"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={onToggleCollapse}
         >
           <ChevronRight
             className={`w-3.5 h-3.5 text-text-secondary transition-transform duration-150 ${
@@ -644,6 +647,17 @@ export default function GalleryGrid() {
     }
   }, [pendingDeleteItem, activeProjectId, session, queryClient]);
 
+  const collapsedCategories = session?.collapsedCategories ?? new Set<string>();
+
+  const handleToggleCollapse = useCallback(
+    (categoryKey: string) => {
+      if (activeProjectId) {
+        useSessionStore.getState().toggleCategoryCollapsed(activeProjectId, categoryKey);
+      }
+    },
+    [activeProjectId]
+  );
+
   const handleCategoryDrop = useCallback(
     async (index: number, category: string | null) => {
       const item = data?.items.find((i) => i.index === index);
@@ -721,21 +735,26 @@ export default function GalleryGrid() {
         </div>
       ) : (
         <div className="flex flex-col gap-8">
-          {grouped.map(([category, items]) => (
-            <CategorySection
-              key={category ?? "__uncategorized__"}
-              name={category}
-              items={items}
-              showHeader={hasCategories}
-              selectedIndices={selectedIndices}
-              thumbVersion={thumbVersion}
-              onToggleSelect={toggleSelect}
-              onPreview={handlePreview}
-              onEdit={handleEdit}
-              onDelete={setPendingDeleteItem}
-              onCategoryDrop={handleCategoryDrop}
-            />
-          ))}
+          {grouped.map(([category, items]) => {
+            const categoryKey = category ?? "__uncategorized__";
+            return (
+              <CategorySection
+                key={categoryKey}
+                name={category}
+                items={items}
+                showHeader={hasCategories}
+                collapsed={hasCategories && collapsedCategories.has(categoryKey)}
+                onToggleCollapse={() => handleToggleCollapse(categoryKey)}
+                selectedIndices={selectedIndices}
+                thumbVersion={thumbVersion}
+                onToggleSelect={toggleSelect}
+                onPreview={handlePreview}
+                onEdit={handleEdit}
+                onDelete={setPendingDeleteItem}
+                onCategoryDrop={handleCategoryDrop}
+              />
+            );
+          })}
         </div>
       )}
 
