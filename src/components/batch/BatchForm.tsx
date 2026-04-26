@@ -81,6 +81,8 @@ export default function BatchForm() {
   const [tagger, setTagger] = useState("joytag");
   const [unifiedCaption, setUnifiedCaption] = useState("");
   const [captionType, setCaptionType] = useState("tags");
+  const [skipExistingCaptions, setSkipExistingCaptions] = useState(false);
+  const [vlmPrompt, setVlmPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<BatchProgress[]>([]);
@@ -113,6 +115,9 @@ export default function BatchForm() {
   useEffect(() => {
     if (settings?.white_balance_method) {
       setWhiteBalanceMethod(settings.white_balance_method);
+    }
+    if (settings?.vlm_endpoint?.prompt && !vlmPrompt) {
+      setVlmPrompt(settings.vlm_endpoint.prompt);
     }
   }, [settings]);
 
@@ -181,6 +186,8 @@ export default function BatchForm() {
         tagger,
         unified_caption: unifiedCaption,
         caption_type: captionType,
+        skip_existing_captions: skipExistingCaptions,
+        vlm_prompt: vlmPrompt,
         color_match: colorMatch,
         color_match_method: colorMatchMethod,
         color_match_reference: colorMatchReference,
@@ -304,6 +311,14 @@ export default function BatchForm() {
                   <SelectItem value="unified">Unified</SelectItem>
                 </SelectContent>
               </Select>
+              <Checkbox
+                id="skip-existing-captions"
+                checked={skipExistingCaptions}
+                onCheckedChange={(c) => setSkipExistingCaptions(!!c)}
+              />
+              <label htmlFor="skip-existing-captions" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
+                Skip images with existing caption
+              </label>
             </div>
             {tagger === "unified" && (
               <Input
@@ -311,6 +326,18 @@ export default function BatchForm() {
                 onChange={(e) => setUnifiedCaption(e.target.value)}
                 placeholder="Enter unified caption..."
               />
+            )}
+            {tagger === "vlm-tagger" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-text-secondary">System Prompt</label>
+                <textarea
+                  value={vlmPrompt}
+                  onChange={(e) => setVlmPrompt(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Describe the image in continuous text."
+                />
+              </div>
             )}
             <div className="flex items-center gap-3">
               <label className="text-sm text-text-secondary">Tag Type</label>
