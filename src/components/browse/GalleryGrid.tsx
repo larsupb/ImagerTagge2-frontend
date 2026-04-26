@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2 } from "lucide-react";
-import { api, getThumbnailUrl } from "@/lib/api";
+import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,6 +45,7 @@ function GalleryThumbnail({
   isSelected,
   thumbVersion,
   onToggleSelect,
+  onPreview,
   onEdit,
   onDelete,
 }: {
@@ -52,6 +53,7 @@ function GalleryThumbnail({
   isSelected: boolean;
   thumbVersion: number;
   onToggleSelect: (index: number, shiftKey: boolean) => void;
+  onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
 }) {
@@ -81,7 +83,13 @@ function GalleryThumbnail({
           tabIndex={0}
           draggable
           onDragStart={handleDragStart}
-          onClick={(e) => onToggleSelect(item.index, e.shiftKey)}
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              onToggleSelect(item.index, e.shiftKey);
+            } else {
+              onPreview(item, e.clientX, e.clientY);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index, false);
           }}
@@ -155,6 +163,7 @@ function CategorySection({
   selectedIndices,
   thumbVersion,
   onToggleSelect,
+  onPreview,
   onEdit,
   onDelete,
   onCategoryDrop,
@@ -165,6 +174,7 @@ function CategorySection({
   selectedIndices: Set<number>;
   thumbVersion: number;
   onToggleSelect: (index: number, shiftKey: boolean) => void;
+  onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
   onCategoryDrop: (index: number, category: string | null) => void;
@@ -234,6 +244,7 @@ function CategorySection({
               isSelected={selectedIndices.has(item.index)}
               thumbVersion={thumbVersion}
               onToggleSelect={onToggleSelect}
+              onPreview={onPreview}
               onEdit={onEdit}
               onDelete={onDelete}
             />
@@ -457,6 +468,43 @@ function UploadZone() {
   );
 }
 
+function ImagePreview({
+  item,
+  x,
+  y,
+  onClose,
+}: {
+  item: GalleryItem;
+  x: number;
+  y: number;
+  onClose: () => void;
+}) {
+  const PAD = 16;
+  const MAX = 800;
+  let left = x + PAD;
+  let top = y + PAD;
+  if (left + MAX > window.innerWidth) left = x - MAX - PAD;
+  if (top + MAX > window.innerHeight) top = y - MAX - PAD;
+  left = Math.max(PAD, left);
+  top = Math.max(PAD, top);
+
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div
+        className="absolute rounded-lg overflow-hidden shadow-2xl border border-border bg-surface"
+        style={{ left, top, maxWidth: MAX, maxHeight: MAX }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={getMediaUrl(item.index)}
+          alt={item.filename}
+          style={{ maxWidth: MAX, maxHeight: MAX, display: "block" }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function GalleryGrid() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = useSessionStore((s) =>
@@ -467,6 +515,7 @@ export default function GalleryGrid() {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [pendingDeleteItem, setPendingDeleteItem] = useState<GalleryItem | null>(null);
   const [thumbVersion, setThumbVersion] = useState(0);
+  const [previewState, setPreviewState] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   const lastSelectedRef = useRef<number | null>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
@@ -532,6 +581,14 @@ export default function GalleryGrid() {
   const clearSelection = useCallback(() => {
     setSelectedIndices(new Set());
     lastSelectedRef.current = null;
+  }, []);
+
+  const handlePreview = useCallback((item: GalleryItem, x: number, y: number) => {
+    setPreviewState({ item, x, y });
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewState(null);
   }, []);
 
   const toggleSelectAll = useCallback(() => {
@@ -673,12 +730,22 @@ export default function GalleryGrid() {
               selectedIndices={selectedIndices}
               thumbVersion={thumbVersion}
               onToggleSelect={toggleSelect}
+              onPreview={handlePreview}
               onEdit={handleEdit}
               onDelete={setPendingDeleteItem}
               onCategoryDrop={handleCategoryDrop}
             />
           ))}
         </div>
+      )}
+
+      {previewState && (
+        <ImagePreview
+          item={previewState.item}
+          x={previewState.x}
+          y={previewState.y}
+          onClose={closePreview}
+        />
       )}
 
       <ConfirmDialog
