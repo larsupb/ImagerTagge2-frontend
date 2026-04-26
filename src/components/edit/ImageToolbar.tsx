@@ -146,7 +146,7 @@ const revertMutation = useMutation({
         total_items: result.total_items,
       });
     }
-    queryClient.invalidateQueries({ queryKey: ["gallery"] });
+    queryClient.removeQueries({ queryKey: ["gallery"] });
     onRefresh();
   };
 

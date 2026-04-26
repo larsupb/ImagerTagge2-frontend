@@ -3,11 +3,12 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2 } from "lucide-react";
 import { api, getThumbnailUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { GalleryItem } from "@/lib/types";
+import type { GalleryItem, GalleryResponse } from "@/lib/types";
 
 const NONE = "__none__";
 const NEW = "__new__";
@@ -42,13 +43,17 @@ function getIssues(item: GalleryItem): string[] {
 function GalleryThumbnail({
   item,
   isSelected,
+  thumbVersion,
   onToggleSelect,
   onEdit,
+  onDelete,
 }: {
   item: GalleryItem;
   isSelected: boolean;
-  onToggleSelect: (index: number) => void;
+  thumbVersion: number;
+  onToggleSelect: (index: number, shiftKey: boolean) => void;
   onEdit: (item: GalleryItem) => void;
+  onDelete: (item: GalleryItem) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -58,15 +63,27 @@ function GalleryThumbnail({
     onEdit(item);
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(item);
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/gallery-item", String(item.index));
+  };
+
   return (
     <Tooltip>
       <TooltipTrigger>
         <div
           role="button"
           tabIndex={0}
-          onClick={() => onToggleSelect(item.index)}
+          draggable
+          onDragStart={handleDragStart}
+          onClick={(e) => onToggleSelect(item.index, e.shiftKey)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index);
+            if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index, false);
           }}
           className={`group relative aspect-square rounded-lg overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised cursor-pointer select-none ${
             isSelected
@@ -77,7 +94,7 @@ function GalleryThumbnail({
           }`}
         >
           <img
-            src={getThumbnailUrl(item.index)}
+            src={`${getThumbnailUrl(item.index)}${thumbVersion > 0 ? `&v=${thumbVersion}` : ""}`}
             alt={item.filename}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -93,10 +110,21 @@ function GalleryThumbnail({
             </span>
           )}
           {item.is_bookmarked && (
-            <span className="absolute top-1.5 right-1.5 text-yellow-400">
+            <span className="absolute top-1.5 right-1.5 text-yellow-400 group-hover:opacity-0 transition-opacity pointer-events-none">
               <Star className="w-3.5 h-3.5 fill-current" />
             </span>
           )}
+
+          <div
+            role="button"
+            aria-label="Delete"
+            className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 text-white/70 hover:text-danger hover:bg-black/40"
+            onClick={handleDeleteClick}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDeleteClick(e as unknown as React.MouseEvent); }}
+            tabIndex={0}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </div>
 
           <div
             className="absolute bottom-0 inset-x-0 bg-black/70 px-2 py-1.5 flex items-center justify-center gap-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -125,20 +153,61 @@ function CategorySection({
   items,
   showHeader,
   selectedIndices,
+  thumbVersion,
   onToggleSelect,
   onEdit,
+  onDelete,
+  onCategoryDrop,
 }: {
   name: string | null;
   items: GalleryItem[];
   showHeader: boolean;
   selectedIndices: Set<number>;
-  onToggleSelect: (index: number) => void;
+  thumbVersion: number;
+  onToggleSelect: (index: number, shiftKey: boolean) => void;
   onEdit: (item: GalleryItem) => void;
+  onDelete: (item: GalleryItem) => void;
+  onCategoryDrop: (index: number, category: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("application/gallery-item")) return;
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("application/gallery-item")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const indexStr = e.dataTransfer.getData("application/gallery-item");
+    if (!indexStr) return;
+    onCategoryDrop(Number(indexStr), name);
+  };
 
   return (
-    <div>
+    <div
+      onDragEnter={showHeader ? handleDragEnter : undefined}
+      onDragOver={showHeader ? handleDragOver : undefined}
+      onDragLeave={showHeader ? handleDragLeave : undefined}
+      onDrop={showHeader ? handleDrop : undefined}
+      className={`rounded-lg p-1 -m-1 transition-colors duration-150 ${
+        isDragOver ? "bg-blue-500/10 ring-2 ring-blue-500/60 ring-inset" : ""
+      }`}
+    >
       {showHeader && (
         <button
           className="flex items-center gap-2 mb-3 w-full text-left group/header"
@@ -163,8 +232,10 @@ function CategorySection({
               key={item.index}
               item={item}
               isSelected={selectedIndices.has(item.index)}
+              thumbVersion={thumbVersion}
               onToggleSelect={onToggleSelect}
               onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -172,6 +243,7 @@ function CategorySection({
     </div>
   );
 }
+
 
 function BatchCategoryAssign({
   selectedIndices,
@@ -284,6 +356,107 @@ function BatchCategoryAssign({
   );
 }
 
+function UploadZone() {
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const session = useSessionStore((s) =>
+    activeProjectId ? s.getProjectSession(activeProjectId) : null
+  );
+  const queryClient = useQueryClient();
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (files: File[]) => {
+    const media = files.filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+    );
+    if (media.length === 0) {
+      toast.warning("No supported image files found");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const result = await api.uploadImages(media);
+      if (result.added.length === 0) {
+        toast.warning("No new image files were added");
+        return;
+      }
+      if (activeProjectId) {
+        useSessionStore.getState().setDatasetInfo(activeProjectId, {
+          ...session!.datasetInfo!,
+          total_items: result.total_items,
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      toast.success(
+        `Added ${result.added.length} image${result.added.length > 1 ? "s" : ""}`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    await upload(Array.from(e.dataTransfer.files));
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      upload(Array.from(e.target.files));
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => !isUploading && fileInputRef.current?.click()}
+      className={`border border-dashed rounded-lg px-4 py-2.5 flex items-center justify-center gap-2 text-sm transition-colors ${
+        isDragOver
+          ? "border-blue-500 bg-blue-500/10 text-blue-400 cursor-copy"
+          : isUploading
+          ? "border-border text-text-muted cursor-not-allowed"
+          : "border-border text-text-muted hover:border-border-subtle hover:text-text-secondary cursor-pointer"
+      }`}
+    >
+      <Upload className="w-3.5 h-3.5 shrink-0" />
+      {isUploading ? "Uploading..." : isDragOver ? "Drop to upload" : "Drop images here or click to upload"}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={handleFileInput}
+      />
+    </div>
+  );
+}
+
 export default function GalleryGrid() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = useSessionStore((s) =>
@@ -291,16 +464,16 @@ export default function GalleryGrid() {
   );
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const dragCounter = useRef(0);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<GalleryItem | null>(null);
+  const [thumbVersion, setThumbVersion] = useState(0);
+  const lastSelectedRef = useRef<number | null>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
   const { data, isLoading } = useQuery({
     queryKey: ["gallery", "all", total],
-    queryFn: () => api.getGallery(0, total || 1),
+    queryFn: () => api.getGallery(0, total),
     enabled: !!session?.datasetInfo && total > 0,
   });
 
@@ -327,17 +500,38 @@ export default function GalleryGrid() {
     [data?.items]
   );
 
-  const toggleSelect = useCallback((index: number) => {
+  const flatItems = useMemo(
+    () => grouped.flatMap(([, items]) => items),
+    [grouped]
+  );
+
+  const toggleSelect = useCallback((index: number, shiftKey: boolean) => {
+    if (shiftKey && lastSelectedRef.current !== null) {
+      const anchorPos = flatItems.findIndex((i) => i.index === lastSelectedRef.current);
+      const currentPos = flatItems.findIndex((i) => i.index === index);
+      if (anchorPos !== -1 && currentPos !== -1) {
+        const [start, end] = anchorPos < currentPos ? [anchorPos, currentPos] : [currentPos, anchorPos];
+        const rangeIndices = flatItems.slice(start, end + 1).map((i) => i.index);
+        setSelectedIndices((prev) => {
+          const next = new Set(prev);
+          for (const idx of rangeIndices) next.add(idx);
+          return next;
+        });
+        return;
+      }
+    }
     setSelectedIndices((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
       else next.add(index);
       return next;
     });
-  }, []);
+    lastSelectedRef.current = index;
+  }, [flatItems]);
 
   const clearSelection = useCallback(() => {
     setSelectedIndices(new Set());
+    lastSelectedRef.current = null;
   }, []);
 
   const toggleSelectAll = useCallback(() => {
@@ -349,66 +543,65 @@ export default function GalleryGrid() {
   const handleEdit = (item: GalleryItem) => {
     if (activeProjectId) {
       useSessionStore.getState().setCurrentIndex(activeProjectId, item.index);
+      useSessionStore.getState().setCurrentItem(activeProjectId, null);
     }
     router.push("/edit");
   };
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current += 1;
-    if (e.dataTransfer.types.includes("Files")) {
-      setIsDragOver(true);
+  const handleDelete = useCallback(async () => {
+    if (!pendingDeleteItem) return;
+    const item = pendingDeleteItem;
+    setPendingDeleteItem(null);
+    try {
+      const result = await api.deleteItem(item.index);
+
+      queryClient.setQueryData<GalleryResponse>(["gallery", "all"], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items
+            .filter((i) => i.index !== item.index)
+            .map((i) => (i.index > item.index ? { ...i, index: i.index - 1 } : i)),
+          total: result.total_items,
+          page_size: result.total_items,
+        };
+      });
+
+      setThumbVersion((v) => v + 1);
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
+
+      if (activeProjectId && session?.datasetInfo) {
+        useSessionStore.getState().setDatasetInfo(activeProjectId, {
+          ...session.datasetInfo,
+          total_items: result.total_items,
+        });
+      }
+
+      setSelectedIndices((prev) => {
+        const next = new Set(prev);
+        next.delete(item.index);
+        return next;
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     }
-  }, []);
+  }, [pendingDeleteItem, activeProjectId, session, queryClient]);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current -= 1;
-    if (dragCounter.current === 0) {
-      setIsDragOver(false);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-  }, []);
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      dragCounter.current = 0;
-      setIsDragOver(false);
-
-      const files = Array.from(e.dataTransfer.files).filter(
-        (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
-      );
-      if (files.length === 0) return;
-
-      setIsUploading(true);
+  const handleCategoryDrop = useCallback(
+    async (index: number, category: string | null) => {
+      const item = data?.items.find((i) => i.index === index);
+      if (item?.category === category) return;
       try {
-        const result = await api.uploadImages(files);
-        if (result.added.length === 0) {
-          toast.warning("No supported image files were found in the drop");
-          return;
-        }
-        if (activeProjectId) {
-          useSessionStore.getState().setDatasetInfo(activeProjectId, {
-            ...session!.datasetInfo!,
-            total_items: result.total_items,
-          });
-        }
-        await queryClient.invalidateQueries({ queryKey: ["gallery"] });
+        await api.setCategory(index, category);
+        queryClient.invalidateQueries({ queryKey: ["gallery"] });
         toast.success(
-          `Added ${result.added.length} image${result.added.length > 1 ? "s" : ""}`
+          category ? `Moved to "${category}"` : "Moved to uncategorized"
         );
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Upload failed");
-      } finally {
-        setIsUploading(false);
+        toast.error(err instanceof Error ? err.message : "Failed to move image");
       }
     },
-    [activeProjectId, session, queryClient]
+    [data?.items, queryClient]
   );
 
   if (!session?.datasetInfo) {
@@ -419,22 +612,10 @@ export default function GalleryGrid() {
   const allSelected = allIndices.length > 0 && selectionCount === allIndices.length;
 
   return (
-    <div
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      className="relative"
-    >
-      {(isDragOver || isUploading) && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 backdrop-blur-sm pointer-events-none">
-          <p className="text-primary font-medium text-lg">
-            {isUploading ? "Uploading..." : "Drop images to add to dataset"}
-          </p>
-        </div>
-      )}
+    <div className="flex flex-col gap-4">
+      <UploadZone />
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm text-text-secondary">{total} images</span>
           {selectionCount > 0 && (
@@ -490,12 +671,23 @@ export default function GalleryGrid() {
               items={items}
               showHeader={hasCategories}
               selectedIndices={selectedIndices}
+              thumbVersion={thumbVersion}
               onToggleSelect={toggleSelect}
               onEdit={handleEdit}
+              onDelete={setPendingDeleteItem}
+              onCategoryDrop={handleCategoryDrop}
             />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDeleteItem}
+        title="Delete Image"
+        message={`Delete ${pendingDeleteItem?.filename}? This also removes its caption and mask.`}
+        onConfirm={handleDelete}
+        onCancel={() => setPendingDeleteItem(null)}
+      />
     </div>
   );
 }
