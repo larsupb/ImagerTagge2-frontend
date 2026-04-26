@@ -13,6 +13,7 @@ import {
   Download,
   Grid3X3,
   BarChart3,
+  Tag,
 } from "lucide-react";
 
 interface OperationCardProps {
@@ -54,6 +55,7 @@ export default function ExportForm() {
   const [maxSteps, setMaxSteps] = useState(2);
   const [isExporting, setIsExporting] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [captionType, setCaptionType] = useState("tags");
   const [logEntry, setLogEntry] = useState<{ index: number; total: number; filename: string; progress: number; log: string } | null>(null);
   const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
 
@@ -61,6 +63,25 @@ export default function ExportForm() {
     queryKey: ["datasetInfo"],
     queryFn: () => api.getDatasetInfo(),
   });
+
+  const { data: captionTypes = [] } = useQuery({
+    queryKey: ["captionTypes"],
+    queryFn: () => api.getCaptionTypes(),
+  });
+
+  const { data: firstItem } = useQuery({
+    queryKey: ["exportActiveCaptionType"],
+    queryFn: () => api.getItem(0),
+    enabled: captionTypes.length > 0,
+  });
+
+  useEffect(() => {
+    if (firstItem?.captions && captionTypes.length > 0) {
+      const active = firstItem.captions.find((c: { is_active: boolean }) => c.is_active);
+      const defaultType = active?.caption_type ?? captionTypes[0] ?? "tags";
+      setCaptionType(defaultType);
+    }
+  }, [firstItem, captionTypes]);
 
   const { data: task, isLoading: isPolling } = useQuery<BatchTask>({
     queryKey: ["exportTask", currentTaskId],
@@ -99,6 +120,7 @@ export default function ExportForm() {
     try {
       const result = await api.startExportTask({
         format,
+        caption_type: captionType,
         bucket_resize: bucketResize,
         bucket_resolution: resolution,
         bucket_step: step,
@@ -164,6 +186,34 @@ export default function ExportForm() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="standard">Standard</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </OperationCard>
+
+        <OperationCard
+          icon={<Tag className="w-5 h-5" />}
+          title="Caption Type"
+          description="Select which caption type to export"
+          checked={true}
+          onCheckedChange={() => {}}
+        >
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-text-secondary">Type</label>
+            <Select
+              value={captionType}
+              onValueChange={(v) => setCaptionType(v ?? "tags")}
+              disabled={captionTypes.length === 0}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder={captionTypes.length === 0 ? "No caption types available" : ""} />
+              </SelectTrigger>
+              <SelectContent>
+                {captionTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
