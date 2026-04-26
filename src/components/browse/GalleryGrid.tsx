@@ -27,6 +27,16 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { GalleryItem, GalleryResponse } from "@/lib/types";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 const NONE = "__none__";
 const NEW = "__new__";
@@ -44,18 +54,22 @@ function GalleryThumbnail({
   item,
   isSelected,
   thumbVersion,
+  categories,
   onToggleSelect,
   onPreview,
   onEdit,
   onDelete,
+  onContextMenuAssign,
 }: {
   item: GalleryItem;
   isSelected: boolean;
   thumbVersion: number;
+  categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
+  onContextMenuAssign: (itemIndex: number, category: string | null) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -76,83 +90,106 @@ function GalleryThumbnail({
   };
 
   return (
-    <Tooltip>
-      <TooltipTrigger>
-        <div
-          role="button"
-          tabIndex={0}
-          draggable
-          onDragStart={handleDragStart}
-          onClick={(e) => {
-            if (e.ctrlKey || e.metaKey) {
-              onToggleSelect(item.index, e.shiftKey);
-            } else {
-              onPreview(item, e.clientX, e.clientY);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index, false);
-          }}
-          className={`group relative aspect-square rounded-lg overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised cursor-pointer select-none ${
-            isSelected
-              ? "ring-3 ring-blue-500 border-2 border-blue-500"
-              : hasIssues
-              ? "border border-danger"
-              : "border border-border"
-          }`}
-        >
-          <img
-            src={`${getThumbnailUrl(item.index)}${thumbVersion > 0 ? `&v=${thumbVersion}` : ""}`}
-            alt={item.filename}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger>
+            <div
+              role="button"
+              tabIndex={0}
+              draggable
+              onDragStart={handleDragStart}
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  onToggleSelect(item.index, e.shiftKey);
+                } else {
+                  onPreview(item, e.clientX, e.clientY);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onToggleSelect(item.index, false);
+              }}
+              className={`group relative aspect-square rounded-lg overflow-hidden hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-200 bg-surface-raised cursor-pointer select-none ${
+                isSelected
+                  ? "ring-3 ring-blue-500 border-2 border-blue-500"
+                  : hasIssues
+                  ? "border border-danger"
+                  : "border border-border"
+              }`}
+            >
+              <img
+                src={`${getThumbnailUrl(item.index)}${thumbVersion > 0 ? `&v=${thumbVersion}` : ""}`}
+                alt={item.filename}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
 
-          {isSelected && (
-            <div className="absolute inset-0 bg-blue-500/40 pointer-events-none" />
-          )}
+              {isSelected && (
+                <div className="absolute inset-0 bg-blue-500/40 pointer-events-none" />
+              )}
 
+              {hasIssues && (
+                <span className="absolute top-1.5 left-1.5 text-danger">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </span>
+              )}
+              {item.is_bookmarked && (
+                <span className="absolute top-1.5 right-1.5 text-yellow-400 group-hover:opacity-0 transition-opacity pointer-events-none">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                </span>
+              )}
+
+              <div
+                role="button"
+                aria-label="Delete"
+                className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 text-white/70 hover:text-danger hover:bg-black/40"
+                onClick={handleDeleteClick}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDeleteClick(e as unknown as React.MouseEvent); }}
+                tabIndex={0}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </div>
+
+              <div
+                className="absolute bottom-0 inset-x-0 bg-black/70 px-2 py-1.5 flex items-center justify-center gap-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={handleEditClick}
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </div>
+            </div>
+          </TooltipTrigger>
           {hasIssues && (
-            <span className="absolute top-1.5 left-1.5 text-danger">
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </span>
+            <TooltipContent>
+              <ul className="text-xs">
+                {issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </TooltipContent>
           )}
-          {item.is_bookmarked && (
-            <span className="absolute top-1.5 right-1.5 text-yellow-400 group-hover:opacity-0 transition-opacity pointer-events-none">
-              <Star className="w-3.5 h-3.5 fill-current" />
-            </span>
-          )}
-
-          <div
-            role="button"
-            aria-label="Delete"
-            className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 text-white/70 hover:text-danger hover:bg-black/40"
-            onClick={handleDeleteClick}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDeleteClick(e as unknown as React.MouseEvent); }}
-            tabIndex={0}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </div>
-
-          <div
-            className="absolute bottom-0 inset-x-0 bg-black/70 px-2 py-1.5 flex items-center justify-center gap-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            onClick={handleEditClick}
-          >
-            <Pencil className="w-3 h-3" />
-            Edit
-          </div>
-        </div>
-      </TooltipTrigger>
-      {hasIssues && (
-        <TooltipContent>
-          <ul className="text-xs">
-            {issues.map((issue) => (
-              <li key={issue}>{issue}</li>
+        </Tooltip>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Tag className="w-3.5 h-3.5" />
+            Assign Category
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {categories.map((cat) => (
+              <ContextMenuItem key={cat} onClick={() => onContextMenuAssign(item.index, cat)}>
+                {cat}
+              </ContextMenuItem>
             ))}
-          </ul>
-        </TooltipContent>
-      )}
-    </Tooltip>
+            {categories.length > 0 && <ContextMenuSeparator />}
+            <ContextMenuItem onClick={() => onContextMenuAssign(item.index, null)}>
+              <span className="text-text-muted">No category</span>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -164,11 +201,13 @@ function CategorySection({
   onToggleCollapse,
   selectedIndices,
   thumbVersion,
+  categories,
   onToggleSelect,
   onPreview,
   onEdit,
   onDelete,
   onCategoryDrop,
+  onContextMenuAssign,
 }: {
   name: string | null;
   items: GalleryItem[];
@@ -177,11 +216,13 @@ function CategorySection({
   onToggleCollapse: () => void;
   selectedIndices: Set<number>;
   thumbVersion: number;
+  categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
   onCategoryDrop: (index: number, category: string | null) => void;
+  onContextMenuAssign: (itemIndex: number, category: string | null) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -246,10 +287,12 @@ function CategorySection({
               item={item}
               isSelected={selectedIndices.has(item.index)}
               thumbVersion={thumbVersion}
+              categories={categories}
               onToggleSelect={onToggleSelect}
               onPreview={onPreview}
               onEdit={onEdit}
               onDelete={onDelete}
+              onContextMenuAssign={onContextMenuAssign}
             />
           ))}
         </div>
@@ -547,6 +590,11 @@ export default function GalleryGrid() {
 
   const hasCategories = grouped.some(([cat]) => cat !== null);
 
+  const categoryNames = useMemo(
+    () => grouped.map(([cat]) => cat).filter((cat): cat is string => cat !== null),
+    [grouped]
+  );
+
   const allIndices = useMemo(
     () => data?.items.map((i) => i.index) ?? [],
     [data?.items]
@@ -658,6 +706,27 @@ export default function GalleryGrid() {
     [activeProjectId]
   );
 
+  const handleContextMenuAssign = useCallback(
+    async (itemIndex: number, category: string | null) => {
+      const indices = selectedIndices.has(itemIndex)
+        ? Array.from(selectedIndices)
+        : [itemIndex];
+      try {
+        await api.setBulkCategory(indices, category);
+        queryClient.invalidateQueries({ queryKey: ["gallery"] });
+        queryClient.invalidateQueries({ queryKey: ["categories"] });
+        toast.success(
+          category
+            ? `Assigned ${indices.length} image${indices.length > 1 ? "s" : ""} to "${category}"`
+            : `Removed category from ${indices.length} image${indices.length > 1 ? "s" : ""}`
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to assign category");
+      }
+    },
+    [selectedIndices, queryClient]
+  );
+
   const handleCategoryDrop = useCallback(
     async (index: number, category: string | null) => {
       const item = data?.items.find((i) => i.index === index);
@@ -747,11 +816,13 @@ export default function GalleryGrid() {
                 onToggleCollapse={() => handleToggleCollapse(categoryKey)}
                 selectedIndices={selectedIndices}
                 thumbVersion={thumbVersion}
+                categories={categoryNames}
                 onToggleSelect={toggleSelect}
                 onPreview={handlePreview}
                 onEdit={handleEdit}
                 onDelete={setPendingDeleteItem}
                 onCategoryDrop={handleCategoryDrop}
+                onContextMenuAssign={handleContextMenuAssign}
               />
             );
           })}
