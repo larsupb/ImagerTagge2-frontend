@@ -58,6 +58,18 @@ export default function ExportForm() {
   const [captionType, setCaptionType] = useState("tags");
   const [logEntry, setLogEntry] = useState<{ index: number; total: number; filename: string; progress: number; log: string } | null>(null);
   const [bucketResult, setBucketResult] = useState<BucketResult | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  const { data: allCategories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => api.getCategories(),
+  });
+
+  useEffect(() => {
+    const cats = new Set(allCategories);
+    cats.add("Uncategorized");
+    setSelectedCategories(cats);
+  }, [allCategories]);
 
   const { data: datasetInfo } = useQuery({
     queryKey: ["datasetInfo"],
@@ -125,6 +137,7 @@ export default function ExportForm() {
         bucket_resolution: resolution,
         bucket_step: step,
         bucket_max_steps: maxSteps,
+        categories: Array.from(selectedCategories),
       });
       setCurrentTaskId(result.task_id);
     } catch (e) {
@@ -161,6 +174,25 @@ export default function ExportForm() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Bucket analysis failed");
     }
+  };
+
+  const handleSelectAllCategories = () => {
+    const cats = new Set(allCategories);
+    cats.add("Uncategorized");
+    setSelectedCategories(cats);
+  };
+
+  const handleDeselectAllCategories = () => {
+    setSelectedCategories(new Set());
+  };
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
   };
 
   return (
@@ -218,6 +250,39 @@ export default function ExportForm() {
             </Select>
           </div>
         </OperationCard>
+
+        <div className="bg-surface rounded-lg border border-border p-4">
+          <div className="flex items-start gap-3">
+            <div className="text-text-muted"><Tag className="w-5 h-5" /></div>
+            <div className="flex-1">
+              <label className="text-sm font-medium cursor-pointer">
+                Categories
+              </label>
+              <p className="text-xs text-text-muted mt-0.5">Select which categories to export</p>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex flex-wrap gap-2">
+              {[...allCategories, "Uncategorized"].map((cat) => (
+                <label key={cat} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={selectedCategories.has(cat)}
+                    onCheckedChange={() => toggleCategory(cat)}
+                  />
+                  {cat}
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button variant="outline" size="sm" onClick={handleSelectAllCategories}>
+                Select All
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDeselectAllCategories}>
+                Deselect All
+              </Button>
+            </div>
+          </div>
+        </div>
 
         <OperationCard
           icon={<Grid3X3 className="w-5 h-5" />}
