@@ -208,6 +208,8 @@ function CategorySection({
   onDelete,
   onCategoryDrop,
   onContextMenuAssign,
+  categoryCheckState,
+  onSelectCategory,
 }: {
   name: string | null;
   items: GalleryItem[];
@@ -223,6 +225,8 @@ function CategorySection({
   onDelete: (item: GalleryItem) => void;
   onCategoryDrop: (index: number, category: string | null) => void;
   onContextMenuAssign: (itemIndex: number, category: string | null) => void;
+  categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
+  onSelectCategory: (select: boolean) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -634,6 +638,18 @@ export default function GalleryGrid() {
     lastSelectedRef.current = null;
   }, []);
 
+  const handleSelectCategory = useCallback((items: GalleryItem[], select: boolean) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (select) {
+        for (const item of items) next.add(item.index);
+      } else {
+        for (const item of items) next.delete(item.index);
+      }
+      return next;
+    });
+  }, []);
+
   const handlePreview = useCallback((item: GalleryItem, x: number, y: number) => {
     setPreviewState({ item, x, y });
   }, []);
@@ -809,6 +825,13 @@ export default function GalleryGrid() {
         <div className="flex flex-col gap-8">
           {grouped.map(([category, items]) => {
             const categoryKey = category ?? "__uncategorized__";
+            const selectedCount = items.filter((item) => selectedIndices.has(item.index)).length;
+            const categoryCheckState =
+              selectedCount === 0
+                ? 'unchecked'
+                : selectedCount === items.length
+                ? 'checked'
+                : 'indeterminate';
             return (
               <CategorySection
                 key={categoryKey}
@@ -826,6 +849,8 @@ export default function GalleryGrid() {
                 onDelete={setPendingDeleteItem}
                 onCategoryDrop={handleCategoryDrop}
                 onContextMenuAssign={handleContextMenuAssign}
+                categoryCheckState={categoryCheckState}
+                onSelectCategory={(select) => handleSelectCategory(items, select)}
               />
             );
           })}
