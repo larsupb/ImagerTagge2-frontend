@@ -274,6 +274,7 @@ function CategorySection({
             indeterminate={categoryCheckState === 'indeterminate'}
             onCheckedChange={() => onSelectCategory(categoryCheckState !== 'checked')}
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            aria-label={`Select all images in ${name ?? "Uncategorized"}`}
           />
           <button
             className="flex items-center gap-2 w-full text-left group/header"
