@@ -100,7 +100,7 @@ function GalleryThumbnail({
               draggable
               onDragStart={handleDragStart}
               onClick={(e) => {
-                if (e.ctrlKey || e.metaKey) {
+                if (e.ctrlKey || e.metaKey || e.shiftKey) {
                   onToggleSelect(item.index, e.shiftKey);
                 } else {
                   onPreview(item, e.clientX, e.clientY);
