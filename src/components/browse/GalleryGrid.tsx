@@ -7,6 +7,7 @@ import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2 } 
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -267,21 +268,29 @@ function CategorySection({
       }`}
     >
       {showHeader && (
-        <button
-          className="flex items-center gap-2 mb-3 w-full text-left group/header"
-          onClick={onToggleCollapse}
-        >
-          <ChevronRight
-            className={`w-3.5 h-3.5 text-text-secondary transition-transform duration-150 ${
-              collapsed ? "" : "rotate-90"
-            }`}
+        <div className="flex items-center gap-2 mb-3">
+          <Checkbox
+            checked={categoryCheckState === 'checked'}
+            indeterminate={categoryCheckState === 'indeterminate'}
+            onCheckedChange={() => onSelectCategory(categoryCheckState !== 'checked')}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
           />
-          <h2 className="text-sm font-semibold text-text group-hover/header:text-text-secondary transition-colors">
-            {name ?? "Uncategorized"}
-          </h2>
-          <span className="text-xs text-text-secondary">{items.length}</span>
-          <div className="flex-1 h-px bg-border" />
-        </button>
+          <button
+            className="flex items-center gap-2 w-full text-left group/header"
+            onClick={onToggleCollapse}
+          >
+            <ChevronRight
+              className={`w-3.5 h-3.5 text-text-secondary transition-transform duration-150 ${
+                collapsed ? "" : "rotate-90"
+              }`}
+            />
+            <h2 className="text-sm font-semibold text-text group-hover/header:text-text-secondary transition-colors">
+              {name ?? "Uncategorized"}
+            </h2>
+            <span className="text-xs text-text-secondary">{items.length}</span>
+            <div className="flex-1 h-px bg-border" />
+          </button>
+        </div>
       )}
       {!collapsed && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
