@@ -20,6 +20,7 @@ export default function DedupPage() {
   const [groups, setGroups] = useState<DedupGroup[]>([]);
   const [keepSelections, setKeepSelections] = useState<number[]>([]);
   const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleScan = async () => {
     setPhase("scanning");
@@ -57,12 +58,14 @@ export default function DedupPage() {
       });
     });
 
+    setIsDeleting(true);
     try {
       const result = await removeDuplicates(paths);
       setDoneInfo({ deleted: result.deleted, groupCount: groups.length });
       setPhase("done");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+      setIsDeleting(false);
     }
   };
 
@@ -178,7 +181,7 @@ export default function DedupPage() {
                   const isKeep = keepSelections[groupIdx] === imgIdx;
                   return (
                     <div
-                      key={imgIdx}
+                      key={img.path}
                       onClick={() => handleKeepSelect(groupIdx, imgIdx)}
                       className="flex flex-col gap-1 items-center cursor-pointer"
                     >
@@ -221,7 +224,7 @@ export default function DedupPage() {
         <button
           onClick={handleDelete}
           className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
-          disabled={deleteCount === 0}
+          disabled={deleteCount === 0 || isDeleting}
         >
           Delete {deleteCount} Images
         </button>
