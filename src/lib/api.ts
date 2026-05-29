@@ -16,6 +16,7 @@ import type {
   ImageVersion,
   ColorMatchPreviewResult,
   BatchTask,
+  DedupScanResponse,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -460,4 +461,24 @@ export async function startBatchTask(options: Record<string, unknown>): Promise<
     throw new Error(`Failed to start batch: ${response.statusText}`);
   }
   return response.json();
+}
+
+export async function scanForDuplicates(
+  phashThreshold: number,
+  ssimThreshold: number
+): Promise<DedupScanResponse> {
+  return apiFetch<DedupScanResponse>("/api/dedup/scan", {
+    method: "POST",
+    body: JSON.stringify({
+      phash_threshold: phashThreshold,
+      ssim_threshold: ssimThreshold,
+    }),
+  });
+}
+
+export async function removeDuplicates(paths: string[]): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>("/api/dedup/remove", {
+    method: "DELETE",
+    body: JSON.stringify({ paths }),
+  });
 }

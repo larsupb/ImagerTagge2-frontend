@@ -204,3 +204,22 @@ export interface BatchTask {
   completed_at: string | null;
   error: string | null;
 }
+
+export interface DedupImageInfo {
+  index: number;
+  filename: string;
+  width: number | null;
+  height: number | null;
+  file_size: number | null;
+  thumbnail_url: string;
+  path: string;
+}
+
+export interface DedupGroup {
+  images: DedupImageInfo[];
+  keep_index: number;
+}
+
+export interface DedupScanResponse {
+  groups: DedupGroup[];
+}
