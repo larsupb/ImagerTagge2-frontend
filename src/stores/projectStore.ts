@@ -18,6 +18,8 @@ interface ProjectStore {
   switchProject: (sessionId: string) => void;
   loadActiveProjects: () => Promise<void>;
   loadRecentProjects: () => Promise<void>;
+  removeRecentProject: (projectId: string) => Promise<void>;
+  createProject: (path: string) => Promise<ProjectOpenResponse>;
   reset: () => void;
 }
 
@@ -97,6 +99,41 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   loadRecentProjects: async () => {
     const response = await api.getRecentProjects();
     set({ recentProjects: response.projects });
+  },
+
+  removeRecentProject: async (projectId) => {
+    await api.removeRecentProject(projectId);
+    set((state) => ({
+      recentProjects: state.recentProjects.filter((p) => p.project_id !== projectId),
+    }));
+  },
+
+  createProject: async (path) => {
+    const result = await api.createProject(path);
+    const sessionId = result.session_id;
+    setSessionId(sessionId);
+    useSessionStore.getState().setDatasetInfo(sessionId, {
+      total_items: result.dataset_info.total_items,
+      base_dir: result.dataset_info.base_dir,
+      masks_dir: result.dataset_info.masks_dir,
+    });
+    set((state) => ({
+      projects: [
+        ...state.projects,
+        {
+          session_id: sessionId,
+          project_id: result.project_id,
+          project_name: result.project_name,
+          path: result.dataset_info.base_dir,
+          total_items: result.dataset_info.total_items,
+          current_index: 0,
+          created_at: Date.now() / 1000,
+          last_accessed: Date.now() / 1000,
+        },
+      ],
+      activeProjectId: sessionId,
+    }));
+    return result;
   },
 
   reset: () => {
