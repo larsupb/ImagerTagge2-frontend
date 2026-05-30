@@ -113,6 +113,24 @@ export const api = {
       return res.json() as Promise<RecentProjectsResponse>;
     }),
 
+  removeRecentProject: (projectId: string) =>
+    fetch(`/api/projects/recent/${projectId}`, { method: "DELETE" }).then((res) => {
+      if (!res.ok) throw new Error("Failed to remove recent project");
+    }),
+
+  createProject: async (path: string): Promise<ProjectOpenResponse> => {
+    const res = await fetch("/api/projects/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || "Failed to create project");
+    }
+    return res.json() as Promise<ProjectOpenResponse>;
+  },
+
   // Dataset (backward compatible)
   loadDataset: (path: string, onlyMissing = false, subdirs = false) =>
     apiFetch<DatasetInfo>("/api/dataset/load", {
@@ -139,6 +157,13 @@ export const api = {
 
   deleteItem: (index: number) =>
     apiFetch<{ total_items: number }>(`/api/dataset/item/${index}`, { method: "DELETE" }),
+
+  deleteItems: (indices: number[]) =>
+    apiFetch<{ total_items: number }>("/api/dataset/items/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(indices),
+    }),
 
   uploadImages: async (files: File[]): Promise<{ added: Array<{ index: number; filename: string }>; total_items: number }> => {
     const sid = await getSessionId();
