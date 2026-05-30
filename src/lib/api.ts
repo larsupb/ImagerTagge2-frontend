@@ -126,7 +126,8 @@ export const api = {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.detail || "Failed to create project");
+      const detail = typeof body.detail === "string" ? body.detail : null;
+      throw new Error(detail || "Failed to create project");
     }
     return res.json() as Promise<ProjectOpenResponse>;
   },
