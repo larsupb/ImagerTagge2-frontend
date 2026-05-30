@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2 } from "lucide-react";
@@ -38,6 +38,13 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const NONE = "__none__";
 const NEW = "__new__";
@@ -54,23 +61,25 @@ function getIssues(item: GalleryItem): string[] {
 function GalleryThumbnail({
   item,
   isSelected,
-  thumbDeleteState,
   categories,
   onToggleSelect,
   onPreview,
   onEdit,
   onDelete,
   onContextMenuAssign,
+  onContextMenuNewCategory,
+  onContextMenuDelete,
 }: {
   item: GalleryItem;
   isSelected: boolean;
-  thumbDeleteState: { v: number; fromIndex: number } | null;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
   onContextMenuAssign: (itemIndex: number, category: string | null) => void;
+  onContextMenuNewCategory: (itemIndex: number) => void;
+  onContextMenuDelete: (itemIndex: number) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -119,7 +128,7 @@ function GalleryThumbnail({
               }`}
             >
               <img
-                src={`${getThumbnailUrl(item.index)}${thumbDeleteState && item.index >= thumbDeleteState.fromIndex ? `&v=${thumbDeleteState.v}` : ""}`}
+                src={`${getThumbnailUrl(item.index)}&t=${item.thumb_token}`}
                 alt={item.filename}
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -187,8 +196,21 @@ function GalleryThumbnail({
             <ContextMenuItem onClick={() => onContextMenuAssign(item.index, null)}>
               <span className="text-text-muted">No category</span>
             </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => onContextMenuNewCategory(item.index)}>
+              <Plus className="w-3.5 h-3.5" />
+              New category...
+            </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={() => onContextMenuDelete(item.index)}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Delete
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -201,7 +223,6 @@ function CategorySection({
   collapsed,
   onToggleCollapse,
   selectedIndices,
-  thumbDeleteState,
   categories,
   onToggleSelect,
   onPreview,
@@ -209,6 +230,8 @@ function CategorySection({
   onDelete,
   onCategoryDrop,
   onContextMenuAssign,
+  onContextMenuNewCategory,
+  onContextMenuDelete,
   categoryCheckState,
   onSelectCategory,
 }: {
@@ -218,7 +241,6 @@ function CategorySection({
   collapsed: boolean;
   onToggleCollapse: () => void;
   selectedIndices: Set<number>;
-  thumbDeleteState: { v: number; fromIndex: number } | null;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
@@ -226,6 +248,8 @@ function CategorySection({
   onDelete: (item: GalleryItem) => void;
   onCategoryDrop: (index: number, category: string | null) => void;
   onContextMenuAssign: (itemIndex: number, category: string | null) => void;
+  onContextMenuNewCategory: (itemIndex: number) => void;
+  onContextMenuDelete: (itemIndex: number) => void;
   categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
   onSelectCategory: (select: boolean) => void;
 }) {
@@ -300,13 +324,14 @@ function CategorySection({
               key={item.index}
               item={item}
               isSelected={selectedIndices.has(item.index)}
-              thumbDeleteState={thumbDeleteState}
               categories={categories}
               onToggleSelect={onToggleSelect}
               onPreview={onPreview}
               onEdit={onEdit}
               onDelete={onDelete}
               onContextMenuAssign={onContextMenuAssign}
+              onContextMenuNewCategory={onContextMenuNewCategory}
+              onContextMenuDelete={onContextMenuDelete}
             />
           ))}
         </div>
@@ -548,6 +573,15 @@ function ImagePreview({
   left = Math.max(PAD, left);
   top = Math.max(PAD, top);
 
+  const [caption, setCaption] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getItem(item.index).then((mediaItem) => {
+      const first = mediaItem.captions[0]?.content ?? null;
+      setCaption(first && first.trim() ? first : null);
+    });
+  }, [item.index]);
+
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div
@@ -560,6 +594,11 @@ function ImagePreview({
           alt={item.filename}
           style={{ maxWidth: MAX, maxHeight: MAX, display: "block" }}
         />
+        {caption && (
+          <div className="absolute bottom-0 inset-x-0 bg-black/70 px-3 py-2 text-sm text-white leading-snug">
+            {caption}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -574,9 +613,11 @@ export default function GalleryGrid() {
   const queryClient = useQueryClient();
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [pendingDeleteItem, setPendingDeleteItem] = useState<GalleryItem | null>(null);
-  const thumbDeleteRef = useRef<{ v: number; fromIndex: number } | null>(null);
   const [previewState, setPreviewState] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   const lastSelectedRef = useRef<number | null>(null);
+  const [newCatDialog, setNewCatDialog] = useState<{ open: boolean; itemIndex: number | null }>({ open: false, itemIndex: null });
+  const [newCatInput, setNewCatInput] = useState("");
+  const [pendingDeleteIndices, setPendingDeleteIndices] = useState<number[] | null>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
@@ -694,10 +735,6 @@ export default function GalleryGrid() {
         .filter((i) => i.index !== item.index)
         .map((i) => (i.index > item.index ? { ...i, index: i.index - 1 } : i));
 
-      // Update ref synchronously before any render is triggered, so the &v= param
-      // is already in place when the data change causes the first re-render.
-      thumbDeleteRef.current = { v: (thumbDeleteRef.current?.v ?? 0) + 1, fromIndex: item.index };
-
       queryClient.setQueryData<GalleryResponse>(["gallery", "all", newTotal], {
         items: updatedItems,
         total: newTotal,
@@ -755,6 +792,54 @@ export default function GalleryGrid() {
     },
     [selectedIndices, queryClient]
   );
+
+  const handleContextMenuNewCategory = useCallback((itemIndex: number) => {
+    setNewCatInput("");
+    setNewCatDialog({ open: true, itemIndex });
+  }, []);
+
+  const handleNewCatCreate = useCallback(async () => {
+    const name = newCatInput.trim();
+    if (!name || newCatDialog.itemIndex === null) return;
+    setNewCatDialog({ open: false, itemIndex: null });
+    await handleContextMenuAssign(newCatDialog.itemIndex, name);
+  }, [newCatInput, newCatDialog, handleContextMenuAssign]);
+
+  const handleContextMenuDelete = useCallback((itemIndex: number) => {
+    const indices = selectedIndices.has(itemIndex)
+      ? Array.from(selectedIndices)
+      : [itemIndex];
+    setPendingDeleteIndices(indices);
+  }, [selectedIndices]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (!pendingDeleteIndices) return;
+    const indices = pendingDeleteIndices;
+    setPendingDeleteIndices(null);
+    try {
+      const result = await api.deleteItems(indices);
+      const newTotal = result.total_items;
+      if (activeProjectId && session?.datasetInfo) {
+        useSessionStore.getState().setDatasetInfo(activeProjectId, {
+          ...session.datasetInfo,
+          total_items: newTotal,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      setSelectedIndices((prev) => {
+        const next = new Set(prev);
+        for (const idx of indices) next.delete(idx);
+        return next;
+      });
+      toast.success(
+        indices.length === 1
+          ? "Image deleted"
+          : `${indices.length} images deleted`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  }, [pendingDeleteIndices, activeProjectId, session, queryClient]);
 
   const handleCategoryDrop = useCallback(
     async (index: number, category: string | null) => {
@@ -851,7 +936,6 @@ export default function GalleryGrid() {
                 collapsed={hasCategories && collapsedCategories.has(categoryKey)}
                 onToggleCollapse={() => handleToggleCollapse(categoryKey)}
                 selectedIndices={selectedIndices}
-                thumbDeleteState={thumbDeleteRef.current}
                 categories={categoryNames}
                 onToggleSelect={toggleSelect}
                 onPreview={handlePreview}
@@ -859,6 +943,8 @@ export default function GalleryGrid() {
                 onDelete={setPendingDeleteItem}
                 onCategoryDrop={handleCategoryDrop}
                 onContextMenuAssign={handleContextMenuAssign}
+                onContextMenuNewCategory={handleContextMenuNewCategory}
+                onContextMenuDelete={handleContextMenuDelete}
                 categoryCheckState={categoryCheckState}
                 onSelectCategory={(select) => handleSelectCategory(items, select)}
               />
@@ -883,6 +969,41 @@ export default function GalleryGrid() {
         onConfirm={handleDelete}
         onCancel={() => setPendingDeleteItem(null)}
       />
+
+      <ConfirmDialog
+        open={!!pendingDeleteIndices}
+        title={pendingDeleteIndices?.length === 1 ? "Delete Image" : `Delete ${pendingDeleteIndices?.length ?? 0} Images`}
+        message={
+          pendingDeleteIndices?.length === 1
+            ? "This also removes its caption and mask."
+            : `Delete ${pendingDeleteIndices?.length ?? 0} images? This also removes their captions and masks.`
+        }
+        onConfirm={handleBulkDelete}
+        onCancel={() => setPendingDeleteIndices(null)}
+      />
+
+      <Dialog open={newCatDialog.open} onOpenChange={(open) => setNewCatDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>New category</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Category name..."
+            value={newCatInput}
+            onChange={(e) => setNewCatInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleNewCatCreate()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewCatDialog({ open: false, itemIndex: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleNewCatCreate} disabled={!newCatInput.trim()}>
+              Create &amp; assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
