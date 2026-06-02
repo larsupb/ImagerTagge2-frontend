@@ -9,17 +9,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 interface NavigationBarProps {
   onNavigate: (index: number) => void;
+  navItems: { index: number }[];
 }
 
-export default function NavigationBar({ onNavigate }: NavigationBarProps) {
+export default function NavigationBar({ onNavigate, navItems }: NavigationBarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = activeProjectId
     ? useSessionStore((s) => s.getProjectSession(activeProjectId))
     : null;
   const currentIndex = session?.currentIndex ?? 0;
   const currentItem = session?.currentItem;
-  const datasetInfo = session?.datasetInfo;
-  const total = datasetInfo?.total_items ?? 0;
+
+  const positionInNav = navItems.findIndex((i) => i.index === currentIndex);
+  const safePosition = Math.max(0, positionInNav);
+  const total = navItems.length;
 
   const handleBookmark = async () => {
     await api.toggleBookmark(currentIndex);
@@ -31,8 +34,11 @@ export default function NavigationBar({ onNavigate }: NavigationBarProps) {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => onNavigate(Math.max(0, currentIndex - 1))}
-        disabled={currentIndex <= 0}
+        onClick={() => {
+          const prev = navItems[positionInNav - 1];
+          if (prev) onNavigate(prev.index);
+        }}
+        disabled={positionInNav <= 0}
       >
         <ChevronLeft className="size-4" />
       </Button>
@@ -41,21 +47,27 @@ export default function NavigationBar({ onNavigate }: NavigationBarProps) {
         type="range"
         min={0}
         max={Math.max(0, total - 1)}
-        value={currentIndex}
-        onChange={(e) => onNavigate(Number(e.target.value))}
+        value={safePosition}
+        onChange={(e) => {
+          const item = navItems[Number(e.target.value)];
+          if (item) onNavigate(item.index);
+        }}
         className="flex-1 accent-bg-primary"
         style={{ accentColor: "var(--color-primary, #3b82f6)" }}
       />
 
       <span className="text-sm text-text-muted min-w-[80px] text-center">
-        {currentIndex + 1} / {total}
+        {safePosition + 1} / {total}
       </span>
 
       <Button
         variant="outline"
         size="icon"
-        onClick={() => onNavigate(Math.min(total - 1, currentIndex + 1))}
-        disabled={currentIndex >= total - 1}
+        onClick={() => {
+          const next = navItems[positionInNav + 1];
+          if (next) onNavigate(next.index);
+        }}
+        disabled={positionInNav >= total - 1}
       >
         <ChevronRight className="size-4" />
       </Button>

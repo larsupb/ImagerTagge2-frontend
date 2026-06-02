@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { api, getMediaUrl, getMaskUrl } from "@/lib/api";
@@ -29,9 +30,32 @@ export default function EditPage() {
     activeProjectId ? s.getProjectSession(activeProjectId) : undefined
   );
   const { currentIndex, currentItem, datasetInfo } = session ?? {};
+
+  const { data: galleryData } = useQuery({
+    queryKey: ["gallery", "all", datasetInfo?.total_items ?? 0],
+    queryFn: () => api.getGallery(0, datasetInfo!.total_items),
+    enabled: !!datasetInfo && (datasetInfo.total_items > 0),
+    staleTime: Infinity,
+  });
+
+  const navItems = useMemo<{ index: number }[]>(() => {
+    if (!currentItem) return [];
+    if (galleryData?.items) {
+      return galleryData.items
+        .filter((i) => i.category === currentItem.category)
+        .sort((a, b) => a.index - b.index)
+        .map((i) => ({ index: i.index }));
+    }
+    const total = datasetInfo?.total_items ?? 0;
+    return Array.from({ length: total }, (_, i) => ({ index: i }));
+  }, [galleryData?.items, currentItem, datasetInfo?.total_items]);
+
+  const positionInNav = navItems.findIndex((i) => i.index === (currentIndex ?? 0));
+
   const setCurrentIndex = useSessionStore((s) => s.setCurrentIndex);
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
 
+  const queryClient = useQueryClient();
   const [captionDirty, setCaptionDirty] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
@@ -97,6 +121,7 @@ export default function EditPage() {
       await api.crop(safeIndex, x, y, width, height);
       setCropMode(false);
       loadItem(safeIndex);
+      queryClient.invalidateQueries({ queryKey: ["versions", safeIndex] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Crop failed");
     } finally {
@@ -114,13 +139,18 @@ export default function EditPage() {
     if (!activeProjectId) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") handleNavigate(Math.max(0, (currentIndex ?? 0) - 1));
-      if (e.key === "ArrowRight")
-        handleNavigate(Math.min((datasetInfo?.total_items ?? 1) - 1, (currentIndex ?? 0) + 1));
+      if (e.key === "ArrowLeft") {
+        const prev = navItems[positionInNav - 1];
+        if (prev) handleNavigate(prev.index);
+      }
+      if (e.key === "ArrowRight") {
+        const next = navItems[positionInNav + 1];
+        if (next) handleNavigate(next.index);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentIndex, datasetInfo, handleNavigate, activeProjectId]);
+  }, [navItems, positionInNav, handleNavigate, activeProjectId]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -197,7 +227,7 @@ export default function EditPage() {
         }}
       />
 
-      <NavigationBar onNavigate={handleNavigate} />
+      <NavigationBar onNavigate={handleNavigate} navItems={navItems} />
 
       <Dialog open={showDirtyDialog} onOpenChange={setShowDirtyDialog}>
         <DialogContent>
