@@ -79,6 +79,23 @@ export default function EditPage() {
     [activeProjectId, setCurrentIndex, setCurrentItem]
   );
 
+  const handleDeleted = useCallback(
+    (deletedIndex: number) => {
+      const pos = navItems.findIndex((i) => i.index === deletedIndex);
+      const newTotal = (datasetInfo?.total_items ?? 1) - 1;
+      let targetIndex: number;
+      if (pos !== -1 && pos < navItems.length - 1) {
+        targetIndex = navItems[pos + 1].index - 1;
+      } else if (pos > 0) {
+        targetIndex = navItems[pos - 1].index;
+      } else {
+        targetIndex = Math.min(deletedIndex, newTotal - 1);
+      }
+      loadItem(Math.max(0, targetIndex));
+    },
+    [navItems, datasetInfo?.total_items, loadItem]
+  );
+
   const handleNavigate = useCallback(
     (index: number) => {
       if (captionDirty) {
@@ -185,7 +202,7 @@ export default function EditPage() {
 
   return (
     <div className="flex flex-col h-full gap-3">
-      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} />
+      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} onDeleted={handleDeleted} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} />
 
       <div className="flex-1 min-h-0">
         {currentItem.is_video ? (
