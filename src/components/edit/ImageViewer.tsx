@@ -82,6 +82,24 @@ export default function ImageViewer({
   }, [mediaUrl]);
 
   useEffect(() => {
+    const canvas = paintCanvasRef?.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const onLoad = () => {
+      canvas.width = img.naturalWidth || 1;
+      canvas.height = img.naturalHeight || 1;
+      const ctx = canvas.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    if (img.complete && img.naturalWidth) {
+      onLoad();
+    } else {
+      img.addEventListener("load", onLoad, { once: true });
+      return () => img.removeEventListener("load", onLoad);
+    }
+  }, [mediaUrl, paintCanvasRef]);
+
+  useEffect(() => {
     if (cropMode) {
       setZoom(1);
       setPanOffset({ x: 0, y: 0 });
@@ -387,7 +405,7 @@ export default function ImageViewer({
         canvas.height = imgRef.current.naturalHeight || 1;
       }
     },
-    [paintCanvasRef]
+    [paintCanvasRef, imgRef]
   );
 
   const handleContainerMouseDown = (e: React.MouseEvent) => {
