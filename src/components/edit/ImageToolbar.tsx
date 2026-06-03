@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpCircle, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop, Sun, RotateCcw } from "lucide-react";
+import { ArrowUpCircle, Brush, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop, Sun, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import VersionHistoryDialog from "./VersionHistoryDialog";
@@ -25,9 +25,16 @@ interface ImageToolbarProps {
   setShowMask: (v: boolean) => void;
   cropMode?: boolean;
   setCropMode?: (v: boolean) => void;
+  paintMode?: boolean;
+  setPaintMode?: (v: boolean) => void;
 }
 
-export default function ImageToolbar({ index, onRefresh, onDeleted, processing, setProcessing, onMaskGenerated, showMask, setShowMask, cropMode, setCropMode }: ImageToolbarProps) {
+export default function ImageToolbar({
+  index, onRefresh, onDeleted, processing, setProcessing,
+  onMaskGenerated, showMask, setShowMask,
+  cropMode, setCropMode,
+  paintMode, setPaintMode,
+}: ImageToolbarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = activeProjectId
     ? useSessionStore((s) => s.getProjectSession(activeProjectId))
@@ -147,7 +154,13 @@ const revertMutation = useMutation({
   };
 
   const handleCrop = () => {
+    if (setPaintMode && paintMode) setPaintMode(false);
     if (setCropMode) setCropMode(!cropMode);
+  };
+
+  const handlePaint = () => {
+    if (setCropMode && cropMode) setCropMode(false);
+    if (setPaintMode) setPaintMode(!paintMode);
   };
 
   const handleWhiteBalance = async (method?: string) => {
@@ -242,6 +255,17 @@ const revertMutation = useMutation({
           <Crop className={`size-4 ${cropMode ? "text-green-400" : "text-green-500"}`} />
         </TooltipTrigger>
         <TooltipContent>Crop</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          onClick={handlePaint}
+          disabled={!!processing || currentItem?.is_video}
+        >
+          <Brush className={`size-4 ${paintMode ? "text-pink-400" : "text-pink-500"}`} />
+        </TooltipTrigger>
+        <TooltipContent>Paint</TooltipContent>
       </Tooltip>
 
       <DropdownButton
