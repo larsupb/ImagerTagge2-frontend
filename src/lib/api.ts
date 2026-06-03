@@ -325,6 +325,22 @@ export const api = {
     });
   },
 
+  paint: async (index: number, blob: Blob): Promise<void> => {
+    const sid = await getSessionId();
+    const form = new FormData();
+    form.append("index", String(index));
+    form.append("paint_png", blob, "paint.png");
+    const res = await fetch("/api/processing/paint", {
+      method: "POST",
+      headers: { "X-Session-ID": sid },
+      body: form,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(error.detail || "Paint failed");
+    }
+  },
+
   whiteBalance: async (index: number, method: string) => {
     return apiFetch("/api/processing/white-balance", {
       method: "POST",
