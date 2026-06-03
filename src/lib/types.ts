@@ -43,6 +43,7 @@ export interface MediaItem {
 export interface GalleryItem {
   index: number;
   thumbnail_url: string;
+  thumb_token: string;
   filename: string;
   is_bookmarked: boolean;
   has_caption: boolean;
@@ -223,3 +224,5 @@ export interface DedupGroup {
 export interface DedupScanResponse {
   groups: DedupGroup[];
 }
+
+export type PaintTool = "pencil" | "quad" | "eraser";

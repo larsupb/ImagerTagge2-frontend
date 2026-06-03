@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
+import type { PaintTool } from "@/lib/types";
 
 interface ImageViewerProps {
   mediaUrl: string;
@@ -13,7 +14,7 @@ interface ImageViewerProps {
   onCropComplete?: (x: number, y: number, width: number, height: number) => void;
   onCropCancel?: () => void;
   paintMode?: boolean;
-  paintTool?: "pencil" | "quad" | "eraser";
+  paintTool?: PaintTool;
   paintSize?: number;
   paintColor?: string;
   paintCanvasRef?: React.RefObject<HTMLCanvasElement | null>;

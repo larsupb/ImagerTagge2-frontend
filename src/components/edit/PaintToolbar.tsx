@@ -1,8 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-
-type PaintTool = "pencil" | "quad" | "eraser";
+import type { PaintTool } from "@/lib/types";
 
 interface PaintToolbarProps {
   tool: PaintTool;
@@ -44,7 +43,9 @@ export default function PaintToolbar({
         <span className="text-xs text-text-muted mr-1">Tool</span>
         {(["pencil", "quad", "eraser"] as PaintTool[]).map((t) => (
           <button
+            type="button"
             key={t}
+            aria-pressed={tool === t}
             onClick={() => onToolChange(t)}
             className={`px-2 py-1 text-xs rounded capitalize transition-colors ${
               tool === t
@@ -63,7 +64,9 @@ export default function PaintToolbar({
         <span className="text-xs text-text-muted mr-1">Size</span>
         {SIZES.map((s) => (
           <button
+            type="button"
             key={s}
+            aria-pressed={size === s}
             onClick={() => onSizeChange(s)}
             className={`px-2 py-1 text-xs rounded transition-colors ${
               size === s
@@ -82,7 +85,10 @@ export default function PaintToolbar({
         <span className="text-xs text-text-muted mr-1">Color</span>
         {COLORS.map(({ hex, label }) => (
           <button
+            type="button"
             key={hex}
+            aria-label={label}
+            aria-pressed={color === hex}
             title={label}
             onClick={() => onColorChange(hex)}
             className="w-5 h-5 rounded-sm transition-transform hover:scale-110"
