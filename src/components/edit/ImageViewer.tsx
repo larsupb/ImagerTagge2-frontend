@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 
 interface ImageViewerProps {
@@ -12,6 +12,11 @@ interface ImageViewerProps {
   cropMode?: boolean;
   onCropComplete?: (x: number, y: number, width: number, height: number) => void;
   onCropCancel?: () => void;
+  paintMode?: boolean;
+  paintTool?: "pencil" | "quad" | "eraser";
+  paintSize?: number;
+  paintColor?: string;
+  paintCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 type ResizeHandle =
@@ -28,6 +33,11 @@ export default function ImageViewer({
   cropMode,
   onCropComplete,
   onCropCancel,
+  paintMode,
+  paintTool,
+  paintSize,
+  paintColor,
+  paintCanvasRef,
 }: ImageViewerProps) {
   const [cropRect, setCropRect] = useState<{
     x: number;
@@ -51,6 +61,7 @@ export default function ImageViewer({
     rect: { x: number; y: number; width: number; height: number };
   } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isPainting, setIsPainting] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -331,29 +342,92 @@ export default function ImageViewer({
     onCropCancel?.();
   };
 
+  function stamp(canvas: HTMLCanvasElement, x: number, y: number) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const tool = paintTool ?? "pencil";
+    const size = paintSize ?? 8;
+    const color = paintColor ?? "#ffffff";
+    const half = size / 2;
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "rgba(0,0,0,1)";
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = color;
+    }
+    if (tool === "quad") {
+      ctx.fillRect(x - half, y - half, size, size);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, half, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  function toCanvasCoords(e: React.MouseEvent): { x: number; y: number } | null {
+    const canvas = paintCanvasRef?.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    return {
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  const handleCanvasMount = useCallback(
+    (canvas: HTMLCanvasElement | null) => {
+      if (paintCanvasRef) {
+        (paintCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
+      }
+      if (canvas && imgRef.current) {
+        canvas.width = imgRef.current.naturalWidth || 1;
+        canvas.height = imgRef.current.naturalHeight || 1;
+      }
+    },
+    [paintCanvasRef]
+  );
+
   const handleContainerMouseDown = (e: React.MouseEvent) => {
     if (cropMode) return;
-    if (!e.shiftKey) return;
-    setIsPanning(true);
-    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    if (e.shiftKey) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      return;
+    }
+    if (paintMode) {
+      const coords = toCanvasCoords(e);
+      if (coords && paintCanvasRef?.current) {
+        setIsPainting(true);
+        stamp(paintCanvasRef.current, coords.x, coords.y);
+      }
+    }
   };
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
     if (isPanning && panStart) {
       setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+      return;
+    }
+    if (isPainting && paintMode && paintCanvasRef?.current) {
+      const coords = toCanvasCoords(e);
+      if (coords) stamp(paintCanvasRef.current, coords.x, coords.y);
     }
   };
 
   const handleContainerMouseUp = () => {
     setIsPanning(false);
     setPanStart(null);
+    setIsPainting(false);
   };
 
   return (
     <div
       ref={containerRef}
       className="relative bg-surface rounded-lg overflow-hidden h-full w-full"
-      style={{ cursor: isPanning ? "grabbing" : undefined }}
+      style={{ cursor: isPanning ? "grabbing" : (paintMode ? "crosshair" : undefined) }}
       onMouseDown={handleContainerMouseDown}
       onMouseMove={handleContainerMouseMove}
       onMouseUp={handleContainerMouseUp}
@@ -378,6 +452,13 @@ export default function ImageViewer({
             src={maskUrl}
             alt="mask"
             className="absolute inset-0 w-full h-full object-contain opacity-50 mix-blend-multiply pointer-events-none"
+          />
+        )}
+        {paintMode && imageLoaded && (
+          <canvas
+            ref={handleCanvasMount}
+            className="absolute inset-0 w-full h-full"
+            style={{ cursor: "crosshair", imageRendering: "pixelated" }}
           />
         )}
       </div>
