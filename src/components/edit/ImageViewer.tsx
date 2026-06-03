@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 interface ImageViewerProps {
@@ -52,6 +52,50 @@ export default function ImageViewer({
   } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+  const zoomRef = useRef(1);
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+
+  useEffect(() => {
+    setZoom(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, [mediaUrl]);
+
+  useEffect(() => {
+    if (cropMode) {
+      setZoom(1);
+      setPanOffset({ x: 0, y: 0 });
+    }
+  }, [cropMode]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+      const currentZoom = zoomRef.current;
+      const currentPan = panOffsetRef.current;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const newZoom = Math.min(8, Math.max(0.25, currentZoom * factor));
+      setZoom(newZoom);
+      setPanOffset({
+        x: cursorX - (cursorX - currentPan.x) * (newZoom / currentZoom),
+        y: cursorY - (cursorY - currentPan.y) * (newZoom / currentZoom),
+      });
+    };
+    container.addEventListener("wheel", handler, { passive: false });
+    return () => container.removeEventListener("wheel", handler);
+  }, []);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     setImageLoaded(true);
@@ -285,22 +329,56 @@ export default function ImageViewer({
     onCropCancel?.();
   };
 
+  const handleContainerMouseDown = (e: React.MouseEvent) => {
+    if (cropMode) return;
+    if (!e.shiftKey) return;
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+  };
+
+  const handleContainerMouseMove = (e: React.MouseEvent) => {
+    if (isPanning && panStart) {
+      setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
+  };
+
+  const handleContainerMouseUp = () => {
+    setIsPanning(false);
+    setPanStart(null);
+  };
+
   return (
-    <div className="relative bg-surface rounded-lg overflow-hidden h-full w-full">
-      <img
-        ref={imgRef}
-        src={mediaUrl}
-        alt={filename}
-        className="absolute inset-0 w-full h-full object-contain"
-        onLoad={handleImageLoad}
-      />
-      {showMask && maskUrl && (
+    <div
+      ref={containerRef}
+      className="relative bg-surface rounded-lg overflow-hidden h-full w-full"
+      style={{ cursor: isPanning ? "grabbing" : undefined }}
+      onMouseDown={handleContainerMouseDown}
+      onMouseMove={handleContainerMouseMove}
+      onMouseUp={handleContainerMouseUp}
+      onMouseLeave={handleContainerMouseUp}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+          transformOrigin: "0 0",
+        }}
+      >
         <img
-          src={maskUrl}
-          alt="mask"
-          className="absolute inset-0 w-full h-full object-contain opacity-50 mix-blend-multiply pointer-events-none"
+          ref={imgRef}
+          src={mediaUrl}
+          alt={filename}
+          className="absolute inset-0 w-full h-full object-contain"
+          onLoad={handleImageLoad}
         />
-      )}
+        {showMask && maskUrl && (
+          <img
+            src={maskUrl}
+            alt="mask"
+            className="absolute inset-0 w-full h-full object-contain opacity-50 mix-blend-multiply pointer-events-none"
+          />
+        )}
+      </div>
       {cropMode && (
         <div
           className="absolute inset-0 cursor-crosshair"
@@ -407,6 +485,7 @@ export default function ImageViewer({
             {processing === "rembg" && "Removing background..."}
             {processing === "mask" && "Generating mask..."}
             {processing === "crop" && "Cropping..."}
+            {processing === "paint" && "Painting..."}
           </span>
         </div>
       )}
