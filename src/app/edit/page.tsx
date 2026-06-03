@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { api, getMediaUrl, getMaskUrl } from "@/lib/api";
+import type { PaintTool } from "@/lib/types";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import EmptyState from "@/components/shared/EmptyState";
@@ -14,6 +15,7 @@ import NavigationBar from "@/components/edit/NavigationBar";
 import CaptionEditor from "@/components/edit/CaptionEditor";
 import CategorySelector from "@/components/edit/CategorySelector";
 import ImageToolbar from "@/components/edit/ImageToolbar";
+import PaintToolbar from "@/components/edit/PaintToolbar";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +63,11 @@ export default function EditPage() {
   const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
   const [cropMode, setCropMode] = useState(false);
+  const [paintMode, setPaintMode] = useState(false);
+  const [paintTool, setPaintTool] = useState<PaintTool>("pencil");
+  const [paintSize, setPaintSize] = useState<number>(8);
+  const [paintColor, setPaintColor] = useState("#ffffff");
+  const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingNavigation = useRef<number | null>(null);
   const getUnsavedTextRef = useRef<(() => string) | null>(null);
 
@@ -200,9 +207,33 @@ export default function EditPage() {
 
   const safeIndex = currentIndex ?? 0;
 
+  const handlePaintSave = async () => {
+    const canvas = paintCanvasRef.current;
+    if (!canvas) return;
+    setProcessing("paint");
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Canvas empty"))),
+          "image/png"
+        );
+      });
+      await api.paint(safeIndex, blob);
+      setPaintMode(false);
+      loadItem(safeIndex);
+      queryClient.invalidateQueries({ queryKey: ["versions", safeIndex] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Paint failed");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handlePaintCancel = () => setPaintMode(false);
+
   return (
     <div className="flex flex-col h-full gap-3">
-      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} onDeleted={handleDeleted} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} />
+      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} onDeleted={handleDeleted} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} paintMode={paintMode} setPaintMode={setPaintMode} />
 
       <div className="flex-1 min-h-0">
         {currentItem.is_video ? (
@@ -217,9 +248,28 @@ export default function EditPage() {
             cropMode={cropMode}
             onCropComplete={handleCropComplete}
             onCropCancel={() => setCropMode(false)}
+            paintMode={paintMode}
+            paintTool={paintTool}
+            paintSize={paintSize}
+            paintColor={paintColor}
+            paintCanvasRef={paintCanvasRef}
           />
         )}
       </div>
+
+      {paintMode && (
+        <PaintToolbar
+          tool={paintTool}
+          onToolChange={setPaintTool}
+          size={paintSize}
+          onSizeChange={setPaintSize}
+          color={paintColor}
+          onColorChange={setPaintColor}
+          onSave={handlePaintSave}
+          onCancel={handlePaintCancel}
+          saving={processing === "paint"}
+        />
+      )}
 
       <CategorySelector
         index={safeIndex}
