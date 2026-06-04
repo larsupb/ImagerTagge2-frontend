@@ -18,6 +18,10 @@ interface ImageViewerProps {
   paintSize?: number;
   paintColor?: string;
   paintCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  maskEditMode?: boolean;
+  maskEditTool?: PaintTool;
+  maskEditSize?: number;
+  maskCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 type ResizeHandle =
@@ -39,6 +43,10 @@ export default function ImageViewer({
   paintSize,
   paintColor,
   paintCanvasRef,
+  maskEditMode,
+  maskEditTool,
+  maskEditSize,
+  maskCanvasRef,
 }: ImageViewerProps) {
   const [cropRect, setCropRect] = useState<{
     x: number;
@@ -62,6 +70,9 @@ export default function ImageViewer({
     rect: { x: number; y: number; width: number; height: number };
   } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageDisplayRect, setImageDisplayRect] = useState<{
+    x: number; y: number; width: number; height: number;
+  } | null>(null);
   const [isPainting, setIsPainting] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +117,27 @@ export default function ImageViewer({
       setPanOffset({ x: 0, y: 0 });
     }
   }, [cropMode]);
+
+  useEffect(() => {
+    const outer = containerRef.current;
+    if (!outer) return;
+    const update = () => {
+      const img = imgRef.current;
+      if (!img || !img.naturalWidth || !img.naturalHeight) return;
+      const w = outer.clientWidth;
+      const h = outer.clientHeight;
+      if (!w || !h) return;
+      const ar = img.naturalWidth / img.naturalHeight;
+      const cr = w / h;
+      let dw: number, dh: number, ox = 0, oy = 0;
+      if (ar > cr) { dw = w; dh = w / ar; oy = (h - dh) / 2; }
+      else { dh = h; dw = h * ar; ox = (w - dw) / 2; }
+      setImageDisplayRect({ x: ox, y: oy, width: dw, height: dh });
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(outer);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -158,6 +190,7 @@ export default function ImageViewer({
     }
 
     (img as HTMLImageElement & { _displayedOffset?: { x: number; y: number }; })._displayedOffset = { x: offsetX, y: offsetY };
+    setImageDisplayRect({ x: offsetX, y: offsetY, width: displayedWidth, height: displayedHeight });
     setImageLoaded(true);
   };
 
@@ -238,7 +271,7 @@ export default function ImageViewer({
       const dy = mouseY - resizeStart.y;
       const start = resizeStart.rect;
 
-      let newRect = { ...start };
+      const newRect = { ...start };
 
       if (resizing.includes("e")) {
         newRect.width = Math.max(20, start.width + dx);
@@ -385,8 +418,25 @@ export default function ImageViewer({
     ctx.globalCompositeOperation = "source-over";
   }
 
-  function toCanvasCoords(e: React.MouseEvent): { x: number; y: number } | null {
-    const canvas = paintCanvasRef?.current;
+  function stampMask(canvas: HTMLCanvasElement, x: number, y: number) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const tool = maskEditTool ?? "pencil";
+    const size = maskEditSize ?? 8;
+    const half = size / 2;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = tool === "eraser" ? "black" : "white";
+    if (tool === "quad") {
+      ctx.fillRect(x - half, y - half, size, size);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, half, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function toCanvasCoords(e: React.MouseEvent, canvasOverride?: HTMLCanvasElement | null): { x: number; y: number } | null {
+    const canvas = canvasOverride ?? paintCanvasRef?.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
@@ -409,6 +459,33 @@ export default function ImageViewer({
     [paintCanvasRef, imgRef]
   );
 
+  const handleMaskCanvasMount = useCallback(
+    (canvas: HTMLCanvasElement | null) => {
+      if (maskCanvasRef) {
+        (maskCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
+      }
+      if (canvas && imgRef.current) {
+        canvas.width = imgRef.current.naturalWidth || 1;
+        canvas.height = imgRef.current.naturalHeight || 1;
+      }
+    },
+    [maskCanvasRef, imgRef]
+  );
+
+  useEffect(() => {
+    if (!maskEditMode || !maskCanvasRef?.current || !maskUrl) return;
+    const canvas = maskCanvasRef.current;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = maskUrl;
+  }, [maskEditMode, maskUrl, maskCanvasRef]);
+
   const handleContainerMouseDown = (e: React.MouseEvent) => {
     if (cropMode) return;
     if (e.shiftKey) {
@@ -423,6 +500,13 @@ export default function ImageViewer({
         stamp(paintCanvasRef.current, coords.x, coords.y);
       }
     }
+    if (maskEditMode) {
+      const coords = toCanvasCoords(e, maskCanvasRef?.current);
+      if (coords && maskCanvasRef?.current) {
+        setIsPainting(true);
+        stampMask(maskCanvasRef.current, coords.x, coords.y);
+      }
+    }
   };
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
@@ -433,6 +517,10 @@ export default function ImageViewer({
     if (isPainting && paintMode && paintCanvasRef?.current) {
       const coords = toCanvasCoords(e);
       if (coords) stamp(paintCanvasRef.current, coords.x, coords.y);
+    }
+    if (isPainting && maskEditMode && maskCanvasRef?.current) {
+      const coords = toCanvasCoords(e, maskCanvasRef.current);
+      if (coords) stampMask(maskCanvasRef.current, coords.x, coords.y);
     }
   };
 
@@ -466,18 +554,40 @@ export default function ImageViewer({
           className="absolute inset-0 w-full h-full object-contain"
           onLoad={handleImageLoad}
         />
-        {showMask && maskUrl && (
+        {showMask && maskUrl && !maskEditMode && (
           <img
             src={maskUrl}
             alt="mask"
             className="absolute inset-0 w-full h-full object-contain opacity-50 mix-blend-multiply pointer-events-none"
           />
         )}
-        {paintMode && imageLoaded && (
+        {paintMode && imageLoaded && imageDisplayRect && (
           <canvas
             ref={handleCanvasMount}
-            className="absolute inset-0 w-full h-full"
-            style={{ cursor: "crosshair", imageRendering: "pixelated" }}
+            style={{
+              position: "absolute",
+              left: imageDisplayRect.x,
+              top: imageDisplayRect.y,
+              width: imageDisplayRect.width,
+              height: imageDisplayRect.height,
+              cursor: "crosshair",
+              imageRendering: "pixelated",
+            }}
+          />
+        )}
+        {maskEditMode && imageLoaded && imageDisplayRect && (
+          <canvas
+            ref={handleMaskCanvasMount}
+            style={{
+              position: "absolute",
+              left: imageDisplayRect.x,
+              top: imageDisplayRect.y,
+              width: imageDisplayRect.width,
+              height: imageDisplayRect.height,
+              opacity: 0.5,
+              mixBlendMode: "multiply",
+              imageRendering: "pixelated",
+            }}
           />
         )}
       </div>
