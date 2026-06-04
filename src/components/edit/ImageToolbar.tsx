@@ -185,6 +185,7 @@ const revertMutation = useMutation({
 
   const handleCrop = () => {
     if (setPaintMode && paintMode) setPaintMode(false);
+    if (setMaskEditMode && maskEditMode) setMaskEditMode(false);
     if (setCropMode) setCropMode(!cropMode);
   };
 
