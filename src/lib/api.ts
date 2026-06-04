@@ -150,8 +150,11 @@ export const api = {
   getHistogram: (index: number) =>
     apiFetch<{ l: number[]; a: number[]; b: number[] }>(`/api/dataset/histogram/${index}`),
 
-  getGallery: (page = 0, pageSize = 50) =>
-    apiFetch<GalleryResponse>(`/api/dataset/gallery?page=${page}&page_size=${pageSize}`),
+  getGallery: (page = 0, pageSize = 50, activeTagType?: string | null) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (activeTagType) params.set("active_tag_type", activeTagType);
+    return apiFetch<GalleryResponse>(`/api/dataset/gallery?${params}`);
+  },
 
   toggleBookmark: (index: number) =>
     apiFetch<{ is_bookmarked: boolean }>(`/api/dataset/bookmark/${index}`, { method: "POST" }),
@@ -341,6 +344,22 @@ export const api = {
     }
   },
 
+  saveMask: async (index: number, blob: Blob): Promise<void> => {
+    const sid = await getSessionId();
+    const form = new FormData();
+    form.append("index", String(index));
+    form.append("mask_png", blob, "mask.png");
+    const res = await fetch("/api/processing/mask/save", {
+      method: "POST",
+      headers: { "X-Session-ID": sid },
+      body: form,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(error.detail || "Mask save failed");
+    }
+  },
+
   whiteBalance: async (index: number, method: string) => {
     return apiFetch("/api/processing/white-balance", {
       method: "POST",
@@ -407,10 +426,10 @@ export const api = {
     return response.json();
   },
 
-  analyzeBuckets: (resolution = 1024, step = 64, maxSteps = 4) =>
+  analyzeBuckets: (resolution = 1024, step = 64, maxSteps = 4, categories?: string[]) =>
     apiFetch<BucketResult>("/api/batch/analyze-buckets", {
       method: "POST",
-      body: JSON.stringify({ resolution, step, max_steps: maxSteps }),
+      body: JSON.stringify({ resolution, step, max_steps: maxSteps, categories }),
     }),
 
   previewColorMatch: (method: string, reference: number, sampleCount = 4) =>
@@ -475,6 +494,31 @@ export const api = {
   // Media URLs
   mediaUrl: getMediaUrl,
   thumbnailUrl: getThumbnailUrl,
+
+  // Session settings
+  getSessionSettings: () =>
+    apiFetch<{ active_tag_type: string | null }>("/api/session/settings"),
+
+  setSessionSettings: (activeTagType: string | null) =>
+    apiFetch<{ active_tag_type: string | null }>("/api/session/settings", {
+      method: "PUT",
+      body: JSON.stringify({ active_tag_type: activeTagType }),
+    }),
+
+  // Project config
+  getProjectConfig: (projectId: string) =>
+    apiFetch<{
+      name: string;
+      settings_overrides: Record<string, unknown>;
+      last_opened: string;
+      version: number;
+    }>(`/api/projects/${projectId}/config`),
+
+  setProjectConfig: (projectId: string, settingsOverrides: Record<string, unknown>) =>
+    apiFetch(`/api/projects/${projectId}/config`, {
+      method: "PUT",
+      body: JSON.stringify({ settings_overrides: settingsOverrides }),
+    }),
 };
 
 // Task polling exports
