@@ -16,6 +16,7 @@ import CaptionEditor from "@/components/edit/CaptionEditor";
 import CategorySelector from "@/components/edit/CategorySelector";
 import ImageToolbar from "@/components/edit/ImageToolbar";
 import PaintToolbar from "@/components/edit/PaintToolbar";
+import MaskToolbar from "@/components/edit/MaskToolbar";
 import {
   Dialog,
   DialogContent,
@@ -57,8 +58,27 @@ export default function EditPage() {
   const setCurrentIndex = useSessionStore((s) => s.setCurrentIndex);
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
 
+  const handleCaptionTextChange = useCallback((text: string) => setCaptionText(text), []);
+
+  const handleSetActiveType = useCallback(
+    (type: string) => {
+      setActiveType(type);
+      if (!activeProjectId) return;
+      useSessionStore.getState().setActiveTagType(activeProjectId, type);
+      const projectId = useProjectStore.getState().projects.find(
+        (p) => p.session_id === activeProjectId
+      )?.project_id;
+      if (projectId) {
+        api.setProjectConfig(projectId, { active_tag_type: type });
+      }
+    },
+    [activeProjectId]
+  );
+
   const queryClient = useQueryClient();
   const [captionDirty, setCaptionDirty] = useState(false);
+  const [activeType, setActiveType] = useState(session?.activeTagType ?? "tag");
+  const [captionText, setCaptionText] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
@@ -68,6 +88,11 @@ export default function EditPage() {
   const [paintSize, setPaintSize] = useState<number>(8);
   const [paintColor, setPaintColor] = useState("#ffffff");
   const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [maskEditMode, setMaskEditMode] = useState(false);
+  const [maskEditTool, setMaskEditTool] = useState<PaintTool>("pencil");
+  const [maskEditSize, setMaskEditSize] = useState<number>(8);
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [maskVersion, setMaskVersion] = useState(0);
   const pendingNavigation = useRef<number | null>(null);
   const getUnsavedTextRef = useRef<(() => string) | null>(null);
 
@@ -231,9 +256,49 @@ export default function EditPage() {
 
   const handlePaintCancel = () => setPaintMode(false);
 
+  const handleMaskSave = async () => {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    setProcessing("mask_save");
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Canvas empty"))),
+          "image/png"
+        );
+      });
+      await api.saveMask(safeIndex, blob);
+      setMaskEditMode(false);
+      setMaskVersion((v) => v + 1);
+      loadItem(safeIndex);
+      queryClient.invalidateQueries({ queryKey: ["versions", safeIndex] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Mask save failed");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleMaskCancel = () => setMaskEditMode(false);
+
   return (
     <div className="flex flex-col h-full gap-3">
-      <ImageToolbar index={safeIndex} onRefresh={() => loadItem(safeIndex)} onDeleted={handleDeleted} processing={processing} setProcessing={setProcessing} onMaskGenerated={() => setShowMask(true)} showMask={showMask} setShowMask={setShowMask} cropMode={cropMode} setCropMode={setCropMode} paintMode={paintMode} setPaintMode={setPaintMode} />
+      <ImageToolbar
+        index={safeIndex}
+        onRefresh={() => loadItem(safeIndex)}
+        onDeleted={handleDeleted}
+        processing={processing}
+        setProcessing={setProcessing}
+        onMaskGenerated={() => setShowMask(true)}
+        showMask={showMask}
+        setShowMask={setShowMask}
+        cropMode={cropMode}
+        setCropMode={setCropMode}
+        paintMode={paintMode}
+        setPaintMode={setPaintMode}
+        maskEditMode={maskEditMode}
+        setMaskEditMode={setMaskEditMode}
+      />
 
       <div className="flex-1 min-h-0">
         {currentItem.is_video ? (
@@ -241,7 +306,7 @@ export default function EditPage() {
         ) : (
           <ImageViewer
             mediaUrl={`${getMediaUrl(currentItem.index)}&v=${encodeURIComponent(`${currentItem.filename}-${currentItem.file_size ?? ""}`)}`}
-            maskUrl={currentItem.has_mask ? getMaskUrl(currentItem.index) : null}
+            maskUrl={currentItem.has_mask ? `${getMaskUrl(currentItem.index)}&v=${maskVersion}` : null}
             filename={currentItem.filename}
             showMask={showMask}
             processing={processing}
@@ -253,6 +318,10 @@ export default function EditPage() {
             paintSize={paintSize}
             paintColor={paintColor}
             paintCanvasRef={paintCanvasRef}
+            maskEditMode={maskEditMode}
+            maskEditTool={maskEditTool}
+            maskEditSize={maskEditSize}
+            maskCanvasRef={maskCanvasRef}
           />
         )}
       </div>
@@ -271,12 +340,28 @@ export default function EditPage() {
         />
       )}
 
+      {maskEditMode && (
+        <MaskToolbar
+          tool={maskEditTool}
+          onToolChange={setMaskEditTool}
+          size={maskEditSize}
+          onSizeChange={setMaskEditSize}
+          onSave={handleMaskSave}
+          onCancel={handleMaskCancel}
+          saving={processing === "mask_save"}
+        />
+      )}
+
       <CategorySelector
         index={safeIndex}
         category={currentItem.category}
         onCategoryChange={(category) => {
           setCurrentItem(activeProjectId, { ...currentItem, category });
         }}
+        activeType={activeType}
+        onTypeChange={handleSetActiveType}
+        captions={currentItem.captions ?? []}
+        captionText={captionText}
       />
 
       <CaptionEditor
@@ -284,11 +369,13 @@ export default function EditPage() {
         index={safeIndex}
         savedCaption={currentItem.caption}
         captions={currentItem.captions ?? []}
+        activeType={activeType}
         onCaptionChange={async (caption) => {
           setCurrentItem(activeProjectId, { ...currentItem, caption });
           await loadItem(safeIndex);
         }}
         onDirtyChange={setCaptionDirty}
+        onTextChange={handleCaptionTextChange}
         getUnsavedText={(getter) => {
           getUnsavedTextRef.current = getter;
         }}
