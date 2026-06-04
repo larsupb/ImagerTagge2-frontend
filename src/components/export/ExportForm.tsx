@@ -168,7 +168,8 @@ export default function ExportForm() {
 
   const handleAnalyzeBuckets = async () => {
     try {
-      const result = await api.analyzeBuckets(resolution, step, maxSteps);
+      const categories = Array.from(selectedCategories);
+      const result = await api.analyzeBuckets(resolution, step, maxSteps, categories);
       setBucketResult(result);
       toast.success("Bucket analysis complete");
     } catch (e) {
@@ -218,6 +219,7 @@ export default function ExportForm() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="musubi_control">Musubi Control</SelectItem>
               </SelectContent>
             </Select>
           </div>
