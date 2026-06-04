@@ -1,6 +1,33 @@
 "use client";
 
 import { useState } from "react";
+
+function getAspectRatioInfo(w: number, h: number): { ratio: string; clean: boolean; label: string } {
+  const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+  const g = gcd(w, h);
+  const rw = w / g;
+  const rh = h / g;
+
+  if (rw <= 24 && rh <= 24) {
+    return { ratio: `${rw}:${rh}`, clean: true, label: `${rw}:${rh}` };
+  }
+
+  const COMMON = [
+    [1, 1], [4, 3], [3, 2], [16, 9], [16, 10], [5, 4], [3, 4], [2, 3], [3, 5],
+    [9, 16], [21, 9], [2, 1], [4, 5], [5, 7], [8, 5], [9, 21],
+  ];
+  const ar = w / h;
+  const [nw, nh] = COMMON.reduce((best, cur) => {
+    const diff = Math.abs(cur[0] / cur[1] - ar);
+    return diff < Math.abs(best[0] / best[1] - ar) ? cur : best;
+  });
+  const deviation = Math.abs(nw / nh - ar) / ar;
+  if (deviation < 0.01) {
+    return { ratio: `${nw}:${nh}`, clean: true, label: `${nw}:${nh}` };
+  }
+
+  return { ratio: ar.toFixed(2), clean: false, label: ar.toFixed(2) };
+}
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpCircle, Brush, Eraser, VenetianMask, History, Pencil, Trash2, Eye, EyeOff, Crop, Sun, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +54,8 @@ interface ImageToolbarProps {
   setCropMode?: (v: boolean) => void;
   paintMode?: boolean;
   setPaintMode?: (v: boolean) => void;
+  maskEditMode?: boolean;
+  setMaskEditMode?: (v: boolean) => void;
 }
 
 export default function ImageToolbar({
@@ -34,6 +63,7 @@ export default function ImageToolbar({
   onMaskGenerated, showMask, setShowMask,
   cropMode, setCropMode,
   paintMode, setPaintMode,
+  maskEditMode, setMaskEditMode,
 }: ImageToolbarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const session = activeProjectId
@@ -160,7 +190,14 @@ const revertMutation = useMutation({
 
   const handlePaint = () => {
     if (setCropMode && cropMode) setCropMode(false);
+    if (setMaskEditMode && maskEditMode) setMaskEditMode(false);
     if (setPaintMode) setPaintMode(!paintMode);
+  };
+
+  const handleMaskEdit = () => {
+    if (setCropMode && cropMode) setCropMode(false);
+    if (setPaintMode && paintMode) setPaintMode(false);
+    if (setMaskEditMode) setMaskEditMode(true);
   };
 
   const handleWhiteBalance = async (method?: string) => {
@@ -183,6 +220,22 @@ const revertMutation = useMutation({
       <span className="text-xs text-text-muted mr-2">
         {currentItem?.filename}
         {currentItem?.width && ` \u2014 ${currentItem.width}\u00d7${currentItem.height}`}
+        {currentItem?.width && currentItem?.height && (() => {
+          const { ratio, clean, label } = getAspectRatioInfo(currentItem.width, currentItem.height);
+          if (clean) {
+            return <span> ({label})</span>;
+          }
+          return (
+            <Tooltip>
+              <TooltipTrigger>
+                <span className="text-red-400"> ({label})</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                Non-standard ratio — consider resizing to a common aspect ratio before training.
+              </TooltipContent>
+            </Tooltip>
+          );
+        })()}
         {currentItem?.file_size && ` \u2014 ${(currentItem.file_size / 1024).toFixed(0)}KB`}
       </span>
 
@@ -233,6 +286,19 @@ const revertMutation = useMutation({
             }
           </TooltipTrigger>
           <TooltipContent>{showMask ? "Hide Mask" : "Show Mask"}</TooltipContent>
+        </Tooltip>
+      )}
+
+      {currentItem?.has_mask && showMask && !maskEditMode && (
+        <Tooltip>
+          <TooltipTrigger
+            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            onClick={handleMaskEdit}
+            disabled={!!processing || currentItem?.is_video}
+          >
+            <Pencil className="size-4 text-blue-400" />
+          </TooltipTrigger>
+          <TooltipContent>Edit Mask</TooltipContent>
         </Tooltip>
       )}
 
