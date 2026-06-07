@@ -223,7 +223,7 @@ const revertMutation = useMutation({
         {currentItem?.filename}
         {currentItem?.width && ` \u2014 ${currentItem.width}\u00d7${currentItem.height}`}
         {currentItem?.width && currentItem?.height && (() => {
-          const { ratio, clean, label } = getAspectRatioInfo(currentItem.width, currentItem.height);
+          const { clean, label } = getAspectRatioInfo(currentItem.width, currentItem.height);
           if (clean) {
             return <span> ({label})</span>;
           }
