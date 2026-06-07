@@ -38,6 +38,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import ToolbarButton from "./ToolbarButton";
 import { Input } from "@/components/ui/input";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
@@ -262,78 +263,37 @@ const revertMutation = useMutation({
         onSelect={(value) => handleRemoveBg(value)}
       />
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handleGenerateMask}
-          disabled={!!processing}
-        >
-          <VenetianMask className="size-4 text-orange-500" />
-        </TooltipTrigger>
-        <TooltipContent>
-          {processing === "mask" ? "Generating..." : "Gen Mask"}
-        </TooltipContent>
-      </Tooltip>
+      <ToolbarButton
+        tooltip={processing === "mask" ? "Generating..." : "Gen Mask"}
+        onClick={handleGenerateMask}
+        disabled={!!processing}
+      >
+        <VenetianMask className="size-4 text-orange-500" />
+      </ToolbarButton>
 
       {currentItem?.has_mask && (
-        <Tooltip>
-          <TooltipTrigger
-            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-            onClick={() => setShowMask(!showMask)}
-          >
-            {showMask
-              ? <EyeOff className="size-4 text-orange-500" />
-              : <Eye className="size-4 text-orange-500" />
-            }
-          </TooltipTrigger>
-          <TooltipContent>{showMask ? "Hide Mask" : "Show Mask"}</TooltipContent>
-        </Tooltip>
+        <ToolbarButton tooltip={showMask ? "Hide Mask" : "Show Mask"} onClick={() => setShowMask(!showMask)}>
+          {showMask ? <EyeOff className="size-4 text-orange-500" /> : <Eye className="size-4 text-orange-500" />}
+        </ToolbarButton>
       )}
 
       {currentItem?.has_mask && showMask && !maskEditMode && (
-        <Tooltip>
-          <TooltipTrigger
-            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-            onClick={handleMaskEdit}
-            disabled={!!processing || currentItem?.is_video}
-          >
-            <Pencil className="size-4 text-blue-400" />
-          </TooltipTrigger>
-          <TooltipContent>Edit Mask</TooltipContent>
-        </Tooltip>
+        <ToolbarButton tooltip="Edit Mask" onClick={handleMaskEdit} disabled={!!processing || currentItem?.is_video}>
+          <Pencil className="size-4 text-blue-400" />
+        </ToolbarButton>
       )}
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={() => setHistoryOpen(true)}
-        >
-          <History className="size-4 text-blue-500" />
-        </TooltipTrigger>
-        <TooltipContent>Version History</TooltipContent>
-      </Tooltip>
+      <ToolbarButton tooltip="Version History" onClick={() => setHistoryOpen(true)}>
+        <History className="size-4 text-blue-500" />
+      </ToolbarButton>
 
-<Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handleCrop}
-          disabled={!!processing || currentItem?.is_video}
-        >
-          <Crop className={`size-4 ${cropMode ? "text-green-400" : "text-green-500"}`} />
-        </TooltipTrigger>
-        <TooltipContent>Crop</TooltipContent>
-      </Tooltip>
+      <ToolbarButton tooltip="Crop" onClick={handleCrop} disabled={!!processing || currentItem?.is_video}>
+        <Crop className={`size-4 ${cropMode ? "text-green-400" : "text-green-500"}`} />
+      </ToolbarButton>
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={handlePaint}
-          disabled={!!processing || currentItem?.is_video}
-        >
-          <Brush className={`size-4 ${paintMode ? "text-pink-400" : "text-pink-500"}`} />
-        </TooltipTrigger>
-        <TooltipContent>Paint</TooltipContent>
-      </Tooltip>
+      <ToolbarButton tooltip="Paint" onClick={handlePaint} disabled={!!processing || currentItem?.is_video}>
+        <Brush className={`size-4 ${paintMode ? "text-pink-400" : "text-pink-500"}`} />
+      </ToolbarButton>
 
       <DropdownButton
         icon={<Sun className="size-4" />}
@@ -365,38 +325,23 @@ const revertMutation = useMutation({
         </div>
       ) : (
         <>
-          <Tooltip>
-            <TooltipTrigger
-              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-              onClick={() => revertMutation.mutate()}
-              disabled={!versions || versions.length === 0 || revertMutation.isPending}
-            >
-              <RotateCcw className={`size-4 ${revertMutation.isPending ? "animate-spin" : "text-indigo-500"}`} />
-            </TooltipTrigger>
-            <TooltipContent>{versions && versions.length > 0 ? "Revert to Previous" : "No version to revert"}</TooltipContent>
-          </Tooltip>
+          <ToolbarButton
+            tooltip={versions && versions.length > 0 ? "Revert to Previous" : "No version to revert"}
+            onClick={() => revertMutation.mutate()}
+            disabled={!versions || versions.length === 0 || revertMutation.isPending}
+          >
+            <RotateCcw className={`size-4 ${revertMutation.isPending ? "animate-spin" : "text-indigo-500"}`} />
+          </ToolbarButton>
 
-          <Tooltip>
-            <TooltipTrigger
-              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-              onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}
-            >
-              <Pencil className="size-4" />
-            </TooltipTrigger>
-            <TooltipContent>Rename</TooltipContent>
-          </Tooltip>
+          <ToolbarButton tooltip="Rename" onClick={() => { setRenaming(true); setNewName(currentItem?.basename ?? ""); }}>
+            <Pencil className="size-4" />
+          </ToolbarButton>
         </>
       )}
 
-      <Tooltip>
-        <TooltipTrigger
-          className="inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 shrink-0 bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          onClick={() => setConfirmDelete(true)}
-        >
-          <Trash2 className="size-4" />
-        </TooltipTrigger>
-        <TooltipContent>Delete</TooltipContent>
-      </Tooltip>
+      <ToolbarButton tooltip="Delete" variant="destructive" onClick={() => setConfirmDelete(true)}>
+        <Trash2 className="size-4" />
+      </ToolbarButton>
 
       <ConfirmDialog
         open={confirmDelete}
