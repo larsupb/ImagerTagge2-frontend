@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import type { PaintTool } from "@/lib/types";
 import CropOverlay from "./CropOverlay";
 import PaintCanvas, { type PaintCanvasHandle } from "./PaintCanvas";
+import MaskCanvas, { type MaskCanvasHandle } from "./MaskCanvas";
 
 interface ImageViewerProps {
   mediaUrl: string;
@@ -23,7 +24,7 @@ interface ImageViewerProps {
   maskEditMode?: boolean;
   maskEditTool?: PaintTool;
   maskEditSize?: number;
-  maskCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef?: React.RefObject<MaskCanvasHandle | null>;
 }
 
 export default function ImageViewer({
@@ -50,7 +51,6 @@ export default function ImageViewer({
     x: number; y: number; width: number; height: number;
   } | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
-  const [isPainting, setIsPainting] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -155,59 +155,6 @@ export default function ImageViewer({
     setImageLoaded(true);
   };
 
-  function stampMask(canvas: HTMLCanvasElement, x: number, y: number) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const tool = maskEditTool ?? "pencil";
-    const size = maskEditSize ?? 8;
-    const half = size / 2;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = tool === "eraser" ? "black" : "white";
-    if (tool === "quad") {
-      ctx.fillRect(x - half, y - half, size, size);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function toMaskCanvasCoords(e: React.MouseEvent, canvas: HTMLCanvasElement): { x: number; y: number } | null {
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
-    return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
-    };
-  }
-
-  const handleMaskCanvasMount = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (maskCanvasRef) {
-        (maskCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
-      }
-      if (canvas && imgRef.current) {
-        canvas.width = imgRef.current.naturalWidth || 1;
-        canvas.height = imgRef.current.naturalHeight || 1;
-      }
-    },
-    [maskCanvasRef, imgRef]
-  );
-
-  useEffect(() => {
-    if (!maskEditMode || !maskCanvasRef?.current || !maskUrl) return;
-    const canvas = maskCanvasRef.current;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-    img.src = maskUrl;
-  }, [maskEditMode, maskUrl, maskCanvasRef]);
-
   const handleContainerMouseDown = (e: React.MouseEvent) => {
     if (cropMode) return;
     if (e.shiftKey) {
@@ -216,13 +163,7 @@ export default function ImageViewer({
       return;
     }
     if (paintMode) paintCanvasRef?.current?.onMouseDown(e);
-    if (maskEditMode) {
-      const coords = maskCanvasRef?.current ? toMaskCanvasCoords(e, maskCanvasRef.current) : null;
-      if (coords && maskCanvasRef?.current) {
-        setIsPainting(true);
-        stampMask(maskCanvasRef.current, coords.x, coords.y);
-      }
-    }
+    if (maskEditMode) maskCanvasRef?.current?.onMouseDown(e);
   };
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
@@ -231,17 +172,14 @@ export default function ImageViewer({
       return;
     }
     if (paintMode) paintCanvasRef?.current?.onMouseMove(e);
-    if (isPainting && maskEditMode && maskCanvasRef?.current) {
-      const coords = toMaskCanvasCoords(e, maskCanvasRef.current);
-      if (coords) stampMask(maskCanvasRef.current, coords.x, coords.y);
-    }
+    if (maskEditMode) maskCanvasRef?.current?.onMouseMove(e);
   };
 
   const handleContainerMouseUp = () => {
     setIsPanning(false);
     setPanStart(null);
-    setIsPainting(false);
     paintCanvasRef?.current?.onMouseUp();
+    maskCanvasRef?.current?.onMouseUp();
   };
 
   return (
@@ -287,18 +225,14 @@ export default function ImageViewer({
           />
         )}
         {maskEditMode && imageLoaded && imageDisplayRect && (
-          <canvas
-            ref={handleMaskCanvasMount}
-            style={{
-              position: "absolute",
-              left: imageDisplayRect.x,
-              top: imageDisplayRect.y,
-              width: imageDisplayRect.width,
-              height: imageDisplayRect.height,
-              opacity: 0.5,
-              mixBlendMode: "multiply",
-              imageRendering: "pixelated",
-            }}
+          <MaskCanvas
+            ref={maskCanvasRef ?? null}
+            tool={maskEditTool ?? "pencil"}
+            size={maskEditSize ?? 8}
+            imageDisplayRect={imageDisplayRect}
+            naturalWidth={naturalSize.w}
+            naturalHeight={naturalSize.h}
+            maskUrl={maskUrl}
           />
         )}
       </div>

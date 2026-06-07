@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, getMediaUrl, getMaskUrl } from "@/lib/api";
 import type { PaintTool } from "@/lib/types";
 import { type PaintCanvasHandle } from "@/components/edit/PaintCanvas";
+import { type MaskCanvasHandle } from "@/components/edit/MaskCanvas";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/session";
 import EmptyState from "@/components/shared/EmptyState";
@@ -92,7 +93,7 @@ export default function EditPage() {
   const [maskEditMode, setMaskEditMode] = useState(false);
   const [maskEditTool, setMaskEditTool] = useState<PaintTool>("pencil");
   const [maskEditSize, setMaskEditSize] = useState<number>(8);
-  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskCanvasRef = useRef<MaskCanvasHandle | null>(null);
   const [maskVersion, setMaskVersion] = useState(0);
   const pendingNavigation = useRef<number | null>(null);
   const getUnsavedTextRef = useRef<(() => string) | null>(null);
@@ -252,16 +253,10 @@ export default function EditPage() {
   const handlePaintCancel = () => setPaintMode(false);
 
   const handleMaskSave = async () => {
-    const canvas = maskCanvasRef.current;
-    if (!canvas) return;
+    if (!maskCanvasRef.current) return;
     setProcessing("mask_save");
     try {
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("Canvas empty"))),
-          "image/png"
-        );
-      });
+      const blob = await maskCanvasRef.current.getBlob();
       await api.saveMask(safeIndex, blob);
       setMaskEditMode(false);
       setMaskVersion((v) => v + 1);
