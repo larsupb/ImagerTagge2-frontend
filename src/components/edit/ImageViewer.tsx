@@ -58,9 +58,11 @@ export default function ImageViewer({
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const zoomRef = useRef(1);
   const panOffsetRef = useRef({ x: 0, y: 0 });
+  const cropModeRef = useRef(cropMode);
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+  useEffect(() => { cropModeRef.current = !!cropMode; }, [cropMode]);
 
   useEffect(() => {
     setZoom(1);
@@ -111,7 +113,7 @@ export default function ImageViewer({
     const container = containerRef.current;
     if (!container) return;
     const handler = (e: WheelEvent) => {
-      if (cropMode) return;
+      if (cropModeRef.current) return;
       e.preventDefault();
       const rect = container.getBoundingClientRect();
       const cursorX = e.clientX - rect.left;
