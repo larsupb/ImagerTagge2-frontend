@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import type { PaintTool } from "@/lib/types";
 import CropOverlay from "./CropOverlay";
+import PaintCanvas, { type PaintCanvasHandle } from "./PaintCanvas";
 
 interface ImageViewerProps {
   mediaUrl: string;
@@ -18,7 +19,7 @@ interface ImageViewerProps {
   paintTool?: PaintTool;
   paintSize?: number;
   paintColor?: string;
-  paintCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  paintCanvasRef?: React.RefObject<PaintCanvasHandle | null>;
   maskEditMode?: boolean;
   maskEditTool?: PaintTool;
   maskEditSize?: number;
@@ -75,24 +76,6 @@ export default function ImageViewer({
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   }, [mediaUrl]);
-
-  useEffect(() => {
-    const canvas = paintCanvasRef?.current;
-    const img = imgRef.current;
-    if (!canvas || !img) return;
-    const onLoad = () => {
-      canvas.width = img.naturalWidth || 1;
-      canvas.height = img.naturalHeight || 1;
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    };
-    if (img.complete && img.naturalWidth) {
-      onLoad();
-    } else {
-      img.addEventListener("load", onLoad, { once: true });
-      return () => img.removeEventListener("load", onLoad);
-    }
-  }, [mediaUrl, paintCanvasRef]);
 
   useEffect(() => {
     const outer = containerRef.current;
@@ -172,30 +155,6 @@ export default function ImageViewer({
     setImageLoaded(true);
   };
 
-  function stamp(canvas: HTMLCanvasElement, x: number, y: number) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const tool = paintTool ?? "pencil";
-    const size = paintSize ?? 8;
-    const color = paintColor ?? "#ffffff";
-    const half = size / 2;
-    if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fillStyle = "rgba(0,0,0,1)";
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = color;
-    }
-    if (tool === "quad") {
-      ctx.fillRect(x - half, y - half, size, size);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalCompositeOperation = "source-over";
-  }
-
   function stampMask(canvas: HTMLCanvasElement, x: number, y: number) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -213,9 +172,7 @@ export default function ImageViewer({
     }
   }
 
-  function toCanvasCoords(e: React.MouseEvent, canvasOverride?: HTMLCanvasElement | null): { x: number; y: number } | null {
-    const canvas = canvasOverride ?? paintCanvasRef?.current;
-    if (!canvas) return null;
+  function toMaskCanvasCoords(e: React.MouseEvent, canvas: HTMLCanvasElement): { x: number; y: number } | null {
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
     return {
@@ -223,19 +180,6 @@ export default function ImageViewer({
       y: (e.clientY - rect.top) * (canvas.height / rect.height),
     };
   }
-
-  const handleCanvasMount = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (paintCanvasRef) {
-        (paintCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
-      }
-      if (canvas && imgRef.current) {
-        canvas.width = imgRef.current.naturalWidth || 1;
-        canvas.height = imgRef.current.naturalHeight || 1;
-      }
-    },
-    [paintCanvasRef, imgRef]
-  );
 
   const handleMaskCanvasMount = useCallback(
     (canvas: HTMLCanvasElement | null) => {
@@ -271,15 +215,9 @@ export default function ImageViewer({
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
     }
-    if (paintMode) {
-      const coords = toCanvasCoords(e);
-      if (coords && paintCanvasRef?.current) {
-        setIsPainting(true);
-        stamp(paintCanvasRef.current, coords.x, coords.y);
-      }
-    }
+    if (paintMode) paintCanvasRef?.current?.onMouseDown(e);
     if (maskEditMode) {
-      const coords = toCanvasCoords(e, maskCanvasRef?.current);
+      const coords = maskCanvasRef?.current ? toMaskCanvasCoords(e, maskCanvasRef.current) : null;
       if (coords && maskCanvasRef?.current) {
         setIsPainting(true);
         stampMask(maskCanvasRef.current, coords.x, coords.y);
@@ -292,12 +230,9 @@ export default function ImageViewer({
       setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
-    if (isPainting && paintMode && paintCanvasRef?.current) {
-      const coords = toCanvasCoords(e);
-      if (coords) stamp(paintCanvasRef.current, coords.x, coords.y);
-    }
+    if (paintMode) paintCanvasRef?.current?.onMouseMove(e);
     if (isPainting && maskEditMode && maskCanvasRef?.current) {
-      const coords = toCanvasCoords(e, maskCanvasRef.current);
+      const coords = toMaskCanvasCoords(e, maskCanvasRef.current);
       if (coords) stampMask(maskCanvasRef.current, coords.x, coords.y);
     }
   };
@@ -306,6 +241,7 @@ export default function ImageViewer({
     setIsPanning(false);
     setPanStart(null);
     setIsPainting(false);
+    paintCanvasRef?.current?.onMouseUp();
   };
 
   return (
@@ -340,17 +276,14 @@ export default function ImageViewer({
           />
         )}
         {paintMode && imageLoaded && imageDisplayRect && (
-          <canvas
-            ref={handleCanvasMount}
-            style={{
-              position: "absolute",
-              left: imageDisplayRect.x,
-              top: imageDisplayRect.y,
-              width: imageDisplayRect.width,
-              height: imageDisplayRect.height,
-              cursor: "crosshair",
-              imageRendering: "pixelated",
-            }}
+          <PaintCanvas
+            ref={paintCanvasRef ?? null}
+            tool={paintTool ?? "pencil"}
+            size={paintSize ?? 8}
+            color={paintColor ?? "#ffffff"}
+            imageDisplayRect={imageDisplayRect}
+            naturalWidth={naturalSize.w}
+            naturalHeight={naturalSize.h}
           />
         )}
         {maskEditMode && imageLoaded && imageDisplayRect && (
