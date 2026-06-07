@@ -69,7 +69,6 @@ const PaintCanvas = forwardRef<PaintCanvasHandle, PaintCanvasProps>(
       if (!canvas) return;
       canvas.width = naturalWidth;
       canvas.height = naturalHeight;
-      canvas.getContext("2d")?.clearRect(0, 0, naturalWidth, naturalHeight);
     }, [naturalWidth, naturalHeight]);
 
     useImperativeHandle(ref, () => ({
@@ -113,6 +112,7 @@ const PaintCanvas = forwardRef<PaintCanvasHandle, PaintCanvasProps>(
           height: imageDisplayRect.height,
           cursor: "crosshair",
           imageRendering: "pixelated",
+          pointerEvents: "none",
         }}
       />
     );
