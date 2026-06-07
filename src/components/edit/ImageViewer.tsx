@@ -186,7 +186,7 @@ export default function ImageViewer({
     <div
       ref={containerRef}
       className="relative bg-surface rounded-lg overflow-hidden h-full w-full"
-      style={{ cursor: isPanning ? "grabbing" : (paintMode ? "crosshair" : undefined) }}
+      style={{ cursor: isPanning ? "grabbing" : (paintMode || maskEditMode ? "crosshair" : undefined) }}
       onMouseDown={handleContainerMouseDown}
       onMouseMove={handleContainerMouseMove}
       onMouseUp={handleContainerMouseUp}

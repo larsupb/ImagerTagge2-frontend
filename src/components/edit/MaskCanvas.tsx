@@ -67,16 +67,19 @@ const MaskCanvas = forwardRef<MaskCanvasHandle, MaskCanvasProps>(
     useEffect(() => {
       if (!maskUrl || !canvasRef.current) return;
       const canvas = canvasRef.current;
+      let cancelled = false;
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
+        if (cancelled) return;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       };
       img.src = maskUrl;
-    }, [maskUrl]);
+      return () => { cancelled = true; };
+    }, [maskUrl, naturalWidth, naturalHeight]);
 
     useImperativeHandle(ref, () => ({
       onMouseDown(e) {
