@@ -65,6 +65,13 @@ export default function ImageViewer({
   useEffect(() => { cropModeRef.current = !!cropMode; }, [cropMode]);
 
   useEffect(() => {
+    if (cropMode) {
+      setZoom(1);
+      setPanOffset({ x: 0, y: 0 });
+    }
+  }, [cropMode]);
+
+  useEffect(() => {
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   }, [mediaUrl]);
