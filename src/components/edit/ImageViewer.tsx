@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import type { PaintTool } from "@/lib/types";
+import CropOverlay from "./CropOverlay";
+import PaintCanvas, { type PaintCanvasHandle } from "./PaintCanvas";
+import MaskCanvas, { type MaskCanvasHandle } from "./MaskCanvas";
 
 interface ImageViewerProps {
   mediaUrl: string;
@@ -17,17 +20,12 @@ interface ImageViewerProps {
   paintTool?: PaintTool;
   paintSize?: number;
   paintColor?: string;
-  paintCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  paintCanvasRef?: React.RefObject<PaintCanvasHandle | null>;
   maskEditMode?: boolean;
   maskEditTool?: PaintTool;
   maskEditSize?: number;
-  maskCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  maskCanvasRef?: React.RefObject<MaskCanvasHandle | null>;
 }
-
-type ResizeHandle =
-  | "nw" | "ne" | "sw" | "se"
-  | "n" | "s" | "e" | "w"
-  | null;
 
 export default function ImageViewer({
   mediaUrl,
@@ -48,32 +46,11 @@ export default function ImageViewer({
   maskEditSize,
   maskCanvasRef,
 }: ImageViewerProps) {
-  const [cropRect, setCropRect] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const [aspectPreset, setAspectPreset] = useState<string | null>(null);
-  const [resizing, setResizing] = useState<ResizeHandle>(null);
-  const [resizeStart, setResizeStart] = useState<{
-    x: number;
-    y: number;
-    rect: { x: number; y: number; width: number; height: number };
-  } | null>(null);
-  const [moving, setMoving] = useState(false);
-  const [moveStart, setMoveStart] = useState<{
-    x: number;
-    y: number;
-    rect: { x: number; y: number; width: number; height: number };
-  } | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageDisplayRect, setImageDisplayRect] = useState<{
     x: number; y: number; width: number; height: number;
   } | null>(null);
-  const [isPainting, setIsPainting] = useState(false);
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -82,34 +59,11 @@ export default function ImageViewer({
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const zoomRef = useRef(1);
   const panOffsetRef = useRef({ x: 0, y: 0 });
+  const cropModeRef = useRef(cropMode);
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
-  const cropModeRef = useRef(!!cropMode);
   useEffect(() => { cropModeRef.current = !!cropMode; }, [cropMode]);
-
-  useEffect(() => {
-    setZoom(1);
-    setPanOffset({ x: 0, y: 0 });
-  }, [mediaUrl]);
-
-  useEffect(() => {
-    const canvas = paintCanvasRef?.current;
-    const img = imgRef.current;
-    if (!canvas || !img) return;
-    const onLoad = () => {
-      canvas.width = img.naturalWidth || 1;
-      canvas.height = img.naturalHeight || 1;
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    };
-    if (img.complete && img.naturalWidth) {
-      onLoad();
-    } else {
-      img.addEventListener("load", onLoad, { once: true });
-      return () => img.removeEventListener("load", onLoad);
-    }
-  }, [mediaUrl, paintCanvasRef]);
 
   useEffect(() => {
     if (cropMode) {
@@ -117,6 +71,11 @@ export default function ImageViewer({
       setPanOffset({ x: 0, y: 0 });
     }
   }, [cropMode]);
+
+  useEffect(() => {
+    setZoom(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, [mediaUrl]);
 
   useEffect(() => {
     const outer = containerRef.current;
@@ -133,6 +92,7 @@ export default function ImageViewer({
       if (ar > cr) { dw = w; dh = w / ar; oy = (h - dh) / 2; }
       else { dh = h; dw = h * ar; ox = (w - dw) / 2; }
       setImageDisplayRect({ x: ox, y: oy, width: dw, height: dh });
+      setNaturalSize({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
     };
     const ro = new ResizeObserver(update);
     ro.observe(outer);
@@ -191,300 +151,9 @@ export default function ImageViewer({
 
     (img as HTMLImageElement & { _displayedOffset?: { x: number; y: number }; })._displayedOffset = { x: offsetX, y: offsetY };
     setImageDisplayRect({ x: offsetX, y: offsetY, width: displayedWidth, height: displayedHeight });
+    setNaturalSize({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
     setImageLoaded(true);
   };
-
-  const aspects = [
-    { label: "1:1", ratio: 1 },
-    { label: "3:2", ratio: 3 / 2 },
-    { label: "2:3", ratio: 2 / 3 },
-    { label: "5:4", ratio: 5 / 4 },
-    { label: "4:5", ratio: 4 / 5 },
-    { label: "Free", ratio: null },
-  ];
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!cropMode || !imgRef.current || !imageLoaded) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName === "BUTTON" || target.closest("button")) return;
-    const imgRect = imgRef.current.getBoundingClientRect();
-    const x = e.clientX - imgRect.left;
-    const y = e.clientY - imgRect.top;
-
-    if (cropRect && !resizing) {
-      const inRect =
-        x >= cropRect.x &&
-        x <= cropRect.x + cropRect.width &&
-        y >= cropRect.y &&
-        y <= cropRect.y + cropRect.height;
-      if (inRect) {
-        setMoveStart({ x, y, rect: { ...cropRect } });
-        setMoving(true);
-        setIsDrawing(false);
-        return;
-      }
-    }
-
-    setDragStart({ x, y });
-    setIsDrawing(true);
-    setCropRect(null);
-    setResizing(null);
-    setMoving(false);
-  };
-
-  const handleResizeMouseDown = (
-    e: React.MouseEvent,
-    handle: ResizeHandle
-  ) => {
-    e.stopPropagation();
-    if (!cropRect || !imgRef.current || !handle) return;
-    const rect = imgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setResizeStart({ x, y, rect: { ...cropRect } });
-    setResizing(handle);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!imgRef.current) return;
-    const rect = imgRef.current.getBoundingClientRect();
-    const mouseX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const mouseY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-
-    if (moving && moveStart && cropRect) {
-      const dx = mouseX - moveStart.x;
-      const dy = mouseY - moveStart.y;
-      const start = moveStart.rect;
-
-      let newX = start.x + dx;
-      let newY = start.y + dy;
-
-      newX = Math.max(0, Math.min(newX, rect.width - start.width));
-      newY = Math.max(0, Math.min(newY, rect.height - start.height));
-
-      setCropRect({ ...cropRect, x: newX, y: newY });
-      return;
-    }
-
-    if (resizing && resizeStart) {
-      const dx = mouseX - resizeStart.x;
-      const dy = mouseY - resizeStart.y;
-      const start = resizeStart.rect;
-
-      const newRect = { ...start };
-
-      if (resizing.includes("e")) {
-        newRect.width = Math.max(20, start.width + dx);
-      }
-      if (resizing.includes("w")) {
-        const newWidth = Math.max(20, start.width - dx);
-        newRect.x = start.x + (start.width - newWidth);
-        newRect.width = newWidth;
-      }
-      if (resizing.includes("s")) {
-        newRect.height = Math.max(20, start.height + dy);
-      }
-      if (resizing.includes("n")) {
-        const newHeight = Math.max(20, start.height - dy);
-        newRect.y = start.y + (start.height - newHeight);
-        newRect.height = newHeight;
-      }
-
-      if (aspectPreset) {
-        const preset = aspects.find((a) => a.label === aspectPreset);
-        if (preset?.ratio) {
-          if (resizing === "e" || resizing === "w") {
-            newRect.height = newRect.width / preset.ratio;
-          } else if (resizing === "n" || resizing === "s") {
-            newRect.width = newRect.height * preset.ratio;
-          }
-        }
-      }
-
-      setCropRect(newRect);
-      return;
-    }
-
-    if (!isDrawing || !dragStart) return;
-
-    let width = mouseX - dragStart.x;
-    let height = mouseY - dragStart.y;
-
-    if (aspectPreset) {
-      const preset = aspects.find((a) => a.label === aspectPreset);
-      if (preset?.ratio) {
-        if (Math.abs(width) > Math.abs(height)) {
-          height = width / preset.ratio;
-        } else {
-          width = height * preset.ratio;
-        }
-      }
-    }
-
-    if (width < 0) {
-      setCropRect({ x: mouseX, y: dragStart.y, width: -width, height: height });
-    } else if (height < 0) {
-      setCropRect({ x: dragStart.x, y: mouseY, width: width, height: -height });
-    } else {
-      setCropRect({ x: dragStart.x, y: dragStart.y, width, height });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDrawing(false);
-    setDragStart(null);
-    setResizing(null);
-    setResizeStart(null);
-    setMoving(false);
-    setMoveStart(null);
-  };
-
-  const handleAccept = async () => {
-    if (!cropRect || !imgRef.current || !imageLoaded) return;
-    const img = imgRef.current;
-    const rect = img.getBoundingClientRect();
-    const naturalWidth = img.naturalWidth;
-    const naturalHeight = img.naturalHeight;
-
-    if (!naturalWidth || !naturalHeight) {
-      return;
-    }
-
-    const containerWidth = rect.width;
-    const containerHeight = rect.height;
-    const imgAspect = naturalWidth / naturalHeight;
-    const containerAspect = containerWidth / containerHeight;
-
-    let displayedWidth: number;
-    let displayedHeight: number;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    if (imgAspect > containerAspect) {
-      displayedWidth = containerWidth;
-      displayedHeight = containerWidth / imgAspect;
-      offsetY = (containerHeight - displayedHeight) / 2;
-    } else {
-      displayedHeight = containerHeight;
-      displayedWidth = containerHeight * imgAspect;
-      offsetX = (containerWidth - displayedWidth) / 2;
-    }
-
-    const imgX = cropRect.x - offsetX;
-    const imgY = cropRect.y - offsetY;
-
-    const scaleX = naturalWidth / displayedWidth;
-    const scaleY = naturalHeight / displayedHeight;
-
-    const crop = {
-      x: Math.max(0, Math.round(imgX * scaleX)),
-      y: Math.max(0, Math.round(imgY * scaleY)),
-      width: Math.round(cropRect.width * scaleX),
-      height: Math.round(cropRect.height * scaleY),
-    };
-
-    if (crop.width > 10 && crop.height > 10) {
-      await onCropComplete?.(crop.x, crop.y, crop.width, crop.height);
-      setCropRect(null);
-    }
-  };
-
-  const handleCancel = () => {
-    setCropRect(null);
-    onCropCancel?.();
-  };
-
-  function stamp(canvas: HTMLCanvasElement, x: number, y: number) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const tool = paintTool ?? "pencil";
-    const size = paintSize ?? 8;
-    const color = paintColor ?? "#ffffff";
-    const half = size / 2;
-    if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fillStyle = "rgba(0,0,0,1)";
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = color;
-    }
-    if (tool === "quad") {
-      ctx.fillRect(x - half, y - half, size, size);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalCompositeOperation = "source-over";
-  }
-
-  function stampMask(canvas: HTMLCanvasElement, x: number, y: number) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const tool = maskEditTool ?? "pencil";
-    const size = maskEditSize ?? 8;
-    const half = size / 2;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = tool === "eraser" ? "black" : "white";
-    if (tool === "quad") {
-      ctx.fillRect(x - half, y - half, size, size);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, half, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function toCanvasCoords(e: React.MouseEvent, canvasOverride?: HTMLCanvasElement | null): { x: number; y: number } | null {
-    const canvas = canvasOverride ?? paintCanvasRef?.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
-    return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
-    };
-  }
-
-  const handleCanvasMount = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (paintCanvasRef) {
-        (paintCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
-      }
-      if (canvas && imgRef.current) {
-        canvas.width = imgRef.current.naturalWidth || 1;
-        canvas.height = imgRef.current.naturalHeight || 1;
-      }
-    },
-    [paintCanvasRef, imgRef]
-  );
-
-  const handleMaskCanvasMount = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (maskCanvasRef) {
-        (maskCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = canvas;
-      }
-      if (canvas && imgRef.current) {
-        canvas.width = imgRef.current.naturalWidth || 1;
-        canvas.height = imgRef.current.naturalHeight || 1;
-      }
-    },
-    [maskCanvasRef, imgRef]
-  );
-
-  useEffect(() => {
-    if (!maskEditMode || !maskCanvasRef?.current || !maskUrl) return;
-    const canvas = maskCanvasRef.current;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-    img.src = maskUrl;
-  }, [maskEditMode, maskUrl, maskCanvasRef]);
 
   const handleContainerMouseDown = (e: React.MouseEvent) => {
     if (cropMode) return;
@@ -493,20 +162,8 @@ export default function ImageViewer({
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
     }
-    if (paintMode) {
-      const coords = toCanvasCoords(e);
-      if (coords && paintCanvasRef?.current) {
-        setIsPainting(true);
-        stamp(paintCanvasRef.current, coords.x, coords.y);
-      }
-    }
-    if (maskEditMode) {
-      const coords = toCanvasCoords(e, maskCanvasRef?.current);
-      if (coords && maskCanvasRef?.current) {
-        setIsPainting(true);
-        stampMask(maskCanvasRef.current, coords.x, coords.y);
-      }
-    }
+    if (paintMode) paintCanvasRef?.current?.onMouseDown(e);
+    if (maskEditMode) maskCanvasRef?.current?.onMouseDown(e);
   };
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
@@ -514,27 +171,22 @@ export default function ImageViewer({
       setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
-    if (isPainting && paintMode && paintCanvasRef?.current) {
-      const coords = toCanvasCoords(e);
-      if (coords) stamp(paintCanvasRef.current, coords.x, coords.y);
-    }
-    if (isPainting && maskEditMode && maskCanvasRef?.current) {
-      const coords = toCanvasCoords(e, maskCanvasRef.current);
-      if (coords) stampMask(maskCanvasRef.current, coords.x, coords.y);
-    }
+    if (paintMode) paintCanvasRef?.current?.onMouseMove(e);
+    if (maskEditMode) maskCanvasRef?.current?.onMouseMove(e);
   };
 
   const handleContainerMouseUp = () => {
     setIsPanning(false);
     setPanStart(null);
-    setIsPainting(false);
+    paintCanvasRef?.current?.onMouseUp();
+    maskCanvasRef?.current?.onMouseUp();
   };
 
   return (
     <div
       ref={containerRef}
       className="relative bg-surface rounded-lg overflow-hidden h-full w-full"
-      style={{ cursor: isPanning ? "grabbing" : (paintMode ? "crosshair" : undefined) }}
+      style={{ cursor: isPanning ? "grabbing" : (paintMode || maskEditMode ? "crosshair" : undefined) }}
       onMouseDown={handleContainerMouseDown}
       onMouseMove={handleContainerMouseMove}
       onMouseUp={handleContainerMouseUp}
@@ -562,132 +214,36 @@ export default function ImageViewer({
           />
         )}
         {paintMode && imageLoaded && imageDisplayRect && (
-          <canvas
-            ref={handleCanvasMount}
-            style={{
-              position: "absolute",
-              left: imageDisplayRect.x,
-              top: imageDisplayRect.y,
-              width: imageDisplayRect.width,
-              height: imageDisplayRect.height,
-              cursor: "crosshair",
-              imageRendering: "pixelated",
-            }}
+          <PaintCanvas
+            ref={paintCanvasRef ?? null}
+            tool={paintTool ?? "pencil"}
+            size={paintSize ?? 8}
+            color={paintColor ?? "#ffffff"}
+            imageDisplayRect={imageDisplayRect}
+            naturalWidth={naturalSize.w}
+            naturalHeight={naturalSize.h}
           />
         )}
         {maskEditMode && imageLoaded && imageDisplayRect && (
-          <canvas
-            ref={handleMaskCanvasMount}
-            style={{
-              position: "absolute",
-              left: imageDisplayRect.x,
-              top: imageDisplayRect.y,
-              width: imageDisplayRect.width,
-              height: imageDisplayRect.height,
-              opacity: 0.5,
-              mixBlendMode: "multiply",
-              imageRendering: "pixelated",
-            }}
+          <MaskCanvas
+            ref={maskCanvasRef ?? null}
+            tool={maskEditTool ?? "pencil"}
+            size={maskEditSize ?? 8}
+            imageDisplayRect={imageDisplayRect}
+            naturalWidth={naturalSize.w}
+            naturalHeight={naturalSize.h}
+            maskUrl={maskUrl}
           />
         )}
       </div>
-      {cropMode && (
-        <div
-          className="absolute inset-0 cursor-crosshair"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex gap-1 bg-black/70 rounded p-1 z-10">
-            {aspects.map((a) => (
-              <button
-                key={a.label}
-                className={`px-2 py-1 text-xs rounded ${
-                  aspectPreset === a.label
-                    ? "bg-blue-500 text-white"
-                    : "text-white hover:bg-white/20"
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setAspectPreset(a.label);
-                }}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-
-          {cropRect && (
-            <div
-              className="absolute border-2 border-green-500 bg-green-500/20 cursor-move"
-              style={{
-                left: cropRect.x,
-                top: cropRect.y,
-                width: cropRect.width,
-                height: cropRect.height,
-              }}
-            >
-              <div
-                className="absolute -top-1 -left-1 w-3 h-3 bg-green-500 cursor-nw-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "nw")}
-              />
-              <div
-                className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 cursor-ne-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "ne")}
-              />
-              <div
-                className="absolute -bottom-1 -left-1 w-3 h-3 bg-green-500 cursor-sw-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "sw")}
-              />
-              <div
-                className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 cursor-se-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "se")}
-              />
-              <div
-                className="absolute top-0 -left-2 w-2 h-full bg-green-500 cursor-w-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "w")}
-              />
-              <div
-                className="absolute top-0 -right-2 w-2 h-full bg-green-500 cursor-e-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "e")}
-              />
-              <div
-                className="absolute left-0 -top-2 w-full h-2 bg-green-500 cursor-n-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "n")}
-              />
-              <div
-                className="absolute left-0 -bottom-2 w-full h-2 bg-green-500 cursor-s-resize hover:bg-green-400"
-                onMouseDown={(e) => handleResizeMouseDown(e, "s")}
-              />
-            </div>
-          )}
-
-          {cropRect && cropRect.width > 5 && cropRect.height > 5 && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-              <button
-                className="px-3 py-1.5 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleAccept();
-                }}
-              >
-                Accept
-              </button>
-              <button
-                className="px-3 py-1.5 bg-red-500 text-white rounded text-sm font-medium hover:bg-red-600"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleCancel();
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
+      {cropMode && imageDisplayRect && (
+        <CropOverlay
+          imageDisplayRect={imageDisplayRect}
+          naturalWidth={naturalSize.w}
+          naturalHeight={naturalSize.h}
+          onCropComplete={onCropComplete!}
+          onCropCancel={onCropCancel!}
+        />
       )}
       {processing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-lg gap-2">
