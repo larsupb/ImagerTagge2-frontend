@@ -220,6 +220,7 @@ export default function ExportForm() {
               <SelectContent>
                 <SelectItem value="standard">Standard</SelectItem>
                 <SelectItem value="musubi_control">Musubi Control</SelectItem>
+                <SelectItem value="musubi_control_json">Musubi Control JSON</SelectItem>
               </SelectContent>
             </Select>
           </div>
