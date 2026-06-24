@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProjectStore } from "@/stores/projectStore";
 import { api } from "@/lib/api";
-import type { Settings, Tagger, Upscaler } from "@/lib/types";
+import type { Settings, Tagger, Upscaler, WorkflowParam } from "@/lib/types";
 import EmptyState from "@/components/shared/EmptyState";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,102 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+
+function ParamControl({
+  param,
+  value,
+  onChange,
+}: {
+  param: WorkflowParam;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const id = `param-${param.key}`;
+
+  if (param.type === "float" || param.type === "int") {
+    const min = param.min ?? 0;
+    const max = param.max ?? 100;
+    const step = param.step ?? 1;
+    const numValue = Number(value ?? param.default);
+
+    return (
+      <div className="flex flex-col gap-1">
+        <label className="block text-sm text-text-secondary" htmlFor={id}>
+          {param.label}
+          {param.hint && (
+            <span className="ml-2 text-xs text-text-muted">({param.hint})</span>
+          )}
+        </label>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            id={id}
+            min={min}
+            max={max}
+            step={step}
+            value={numValue}
+            onChange={(e) =>
+              onChange(param.type === "int" ? parseInt(e.target.value) : parseFloat(e.target.value))
+            }
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={numValue}
+            onChange={(e) =>
+              onChange(param.type === "int" ? parseInt(e.target.value) : parseFloat(e.target.value))
+            }
+            className="w-20 px-2 py-1 bg-background border border-border rounded text-sm text-text text-right"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (param.type === "select") {
+    return (
+      <div className="flex flex-col gap-1">
+        <label className="block text-sm text-text-secondary" htmlFor={id}>
+          {param.label}
+        </label>
+        <select
+          id={id}
+          value={String(value ?? param.default)}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-text focus:outline-none focus:border-ring"
+        >
+          {param.options?.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  if (param.type === "text") {
+    return (
+      <div className="flex flex-col gap-1">
+        <label className="block text-sm text-text-secondary" htmlFor={id}>
+          {param.label}
+        </label>
+        <textarea
+          id={id}
+          value={String(value ?? param.default)}
+          onChange={(e) => onChange(e.target.value)}
+          rows={2}
+          className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-text resize-y focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
 
 function Section({
   title,
@@ -140,6 +236,37 @@ export default function SettingsPage() {
             className="w-32"
           />
         </div>
+
+        {localSettings.upscaler?.startsWith("comfyui-") && (
+          upscalers?.find((u) => u.name === localSettings.upscaler)?.params && (
+            <div className="mt-4 p-4 bg-surface-raised rounded-lg border border-border flex flex-col gap-4">
+              <h4 className="text-sm font-medium text-text">Workflow Parameters</h4>
+              {(upscalers?.find((u) => u.name === localSettings.upscaler)?.params ?? []).map((param) => {
+                const currentValues = localSettings.comfyui_fparams?.[localSettings.upscaler!] ?? {};
+                const value = currentValues[param.key] ?? param.default;
+
+                return (
+                  <ParamControl
+                    key={param.key}
+                    param={param}
+                    value={value}
+                    onChange={(newVal) => {
+                      const nextFparams = {
+                        ...(localSettings.comfyui_fparams ?? {}),
+                        [localSettings.upscaler!]: {
+                          ...(localSettings.comfyui_fparams?.[localSettings.upscaler!] ?? {}),
+                          [param.key]: newVal,
+                        },
+                      };
+                      setLocalSettings({ ...localSettings, comfyui_fparams: nextFparams });
+                      save("comfyui_fparams", nextFparams);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )
+        )}
       </Section>
 
       <Section title="Taggers">
