@@ -103,6 +103,11 @@ export interface Settings {
     base_url: string;
     model: string;
   };
+  comfyui?: {
+    url?: string;
+    api_token?: string;
+    workflow_file?: string;
+  };
 }
 
 export interface Tagger {
@@ -118,9 +123,11 @@ export interface TaggersResponse {
 
 export interface Upscaler {
   name: string;
-  filename: string;
+  filename: string | null;
   scale_factor: number;
   url: string | null;
+  workflow_file?: string | null;
+  display_name?: string | null;
 }
 
 export interface BackgroundRemover {

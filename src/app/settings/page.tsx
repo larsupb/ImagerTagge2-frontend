@@ -116,8 +116,8 @@ export default function SettingsPage() {
             </SelectTrigger>
             <SelectContent>
               {upscalers?.map((u) => (
-                <SelectItem key={u.name} value={u.name}>
-                  {u.name} ({u.scale_factor}x)
+                <SelectItem key={(u.display_name ?? u.name)} value={(u.display_name ?? u.name)}>
+                  {(u.display_name ?? u.name)} ({u.scale_factor}x)
                 </SelectItem>
               ))}
             </SelectContent>
@@ -380,7 +380,80 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="ComfyUI">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">ComfyUI URL</label>
+          <Input
+            value={localSettings.comfyui?.url ?? "http://localhost:8188"}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                comfyui: { ...(localSettings.comfyui ?? {}), url: e.target.value },
+              })
+            }
+            onBlur={() => {
+              const cu = localSettings.comfyui;
+              if (cu) save("comfyui", { url: cu.url, api_token: cu.api_token ?? "", workflow_file: cu.workflow_file ?? "" });
+            }}
+            placeholder="http://localhost:8188"
+          />
+        </div>
 
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">API Token</label>
+          <Input
+            type="password"
+            value={localSettings.comfyui?.api_token ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                comfyui: { ...(localSettings.comfyui ?? {}), api_token: e.target.value },
+              })
+            }
+            onBlur={() => {
+              const cu = localSettings.comfyui;
+              if (cu) save("comfyui", { url: cu.url ?? "http://localhost:8188", api_token: cu.api_token, workflow_file: cu.workflow_file ?? "" });
+            }}
+            placeholder="Leave empty if not configured"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Workflow</label>
+          <Select
+            value={
+              upscalers?.find((u) => u.workflow_file && u.name.startsWith("comfyui-"))?.workflow_file ?? ""
+            }
+            onValueChange={(v) => {
+              if (!v) return;
+              const matched = upscalers?.find((u) => u.workflow_file === v);
+              if (matched) {
+                setLocalSettings({ ...localSettings, upscaler: matched.name, comfyui: { ...(localSettings.comfyui ?? {}), workflow_file: v } });
+                save("upscaler", matched.name);
+                save("comfyui", { ...(localSettings.comfyui ?? {}), workflow_file: v });
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select workflow" />
+            </SelectTrigger>
+            <SelectContent>
+              {upscalers
+                ?.filter((u) => u.workflow_file)
+                .map((u) => (
+                  <SelectItem key={(u.display_name ?? u.name)} value={u.workflow_file!}>
+                    {(u.display_name ?? u.name)}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <p className="text-xs text-text-muted">
+          Select a ComfyUI upscaler from the Upscaling section above, or choose a workflow here.
+          ComfyUI must be running at the configured URL with the required models installed.
+        </p>
+      </Section>
     </div>
   );
 }
