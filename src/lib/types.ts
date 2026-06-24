@@ -108,6 +108,7 @@ export interface Settings {
     api_token?: string;
     workflow_file?: string;
   };
+  comfyui_fparams?: Record<string, Record<string, unknown>>;
 }
 
 export interface Tagger {
@@ -121,6 +122,20 @@ export interface TaggersResponse {
   default_tagger: string;
 }
 
+export interface WorkflowParam {
+  key: string;
+  label: string;
+  type: "float" | "int" | "select" | "text";
+  node_id: string;
+  input_name: string;
+  default: unknown;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+  hint?: string;
+}
+
 export interface Upscaler {
   name: string;
   filename: string | null;
@@ -128,6 +143,7 @@ export interface Upscaler {
   url: string | null;
   workflow_file?: string | null;
   display_name?: string | null;
+  params?: WorkflowParam[];
 }
 
 export interface BackgroundRemover {
