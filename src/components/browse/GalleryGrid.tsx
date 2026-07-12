@@ -242,6 +242,28 @@ function GalleryThumbnail({
             )}
           </ContextMenuSubContent>
         </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={selectedCount < 1}>
+            <MessageSquare className="w-3.5 h-3.5" />
+            Caption selected
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {taggers.length === 0 ? (
+              <ContextMenuItem disabled>
+                <span className="text-text-muted">No taggers available</span>
+              </ContextMenuItem>
+            ) : (
+              taggers.map((t) => (
+                <ContextMenuItem
+                  key={t.id}
+                  onClick={() => onContextMenuCaption(t.id)}
+                >
+                  {t.name}
+                </ContextMenuItem>
+              ))
+            )}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
