@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2 } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand } from "lucide-react";
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { GalleryItem, GalleryResponse } from "@/lib/types";
+import type { GalleryItem, GalleryResponse, Upscaler } from "@/lib/types";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -69,17 +69,25 @@ function GalleryThumbnail({
   onContextMenuAssign,
   onContextMenuNewCategory,
   onContextMenuDelete,
+  upscalers,
+  selectedCount,
+  onContextMenuUpscale,
+  onContextMenuSelect,
 }: {
   item: GalleryItem;
   isSelected: boolean;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
+  onContextMenuSelect: (index: number, shiftKey: boolean, ctrlKey: boolean) => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
   onContextMenuAssign: (itemIndex: number, category: string | null) => void;
   onContextMenuNewCategory: (itemIndex: number) => void;
   onContextMenuDelete: (itemIndex: number) => void;
+  upscalers: Upscaler[];
+  selectedCount: number;
+  onContextMenuUpscale: (upscaler: string) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -109,6 +117,11 @@ function GalleryThumbnail({
               tabIndex={0}
               draggable
               onDragStart={handleDragStart}
+              onMouseDown={(e) => {
+                if (e.button === 2) {
+                  onContextMenuSelect(item.index, e.shiftKey, e.ctrlKey || e.metaKey);
+                }
+              }}
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey || e.shiftKey) {
                   onToggleSelect(item.index, e.shiftKey);
@@ -203,6 +216,28 @@ function GalleryThumbnail({
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={selectedCount < 1}>
+            <Expand className="w-3.5 h-3.5" />
+            Upscale selected
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {upscalers.length === 0 ? (
+              <ContextMenuItem disabled>
+                <span className="text-text-muted">No upscalers available</span>
+              </ContextMenuItem>
+            ) : (
+              upscalers.map((u) => (
+                <ContextMenuItem
+                  key={u.name}
+                  onClick={() => onContextMenuUpscale(u.name)}
+                >
+                  {u.display_name || u.name}
+                </ContextMenuItem>
+              ))
+            )}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuItem
           className="text-destructive focus:text-destructive"
@@ -232,6 +267,11 @@ function CategorySection({
   onContextMenuAssign,
   onContextMenuNewCategory,
   onContextMenuDelete,
+  upscalers,
+  selectedCount,
+  onContextMenuUpscale,
+  onContextMenuSelect,
+  onBackgroundMouseDown,
   categoryCheckState,
   onSelectCategory,
 }: {
@@ -243,6 +283,8 @@ function CategorySection({
   selectedIndices: Set<number>;
   categories: string[];
   onToggleSelect: (index: number, shiftKey: boolean) => void;
+  onContextMenuSelect: (index: number, shiftKey: boolean, ctrlKey: boolean) => void;
+  onBackgroundMouseDown: () => void;
   onPreview: (item: GalleryItem, x: number, y: number) => void;
   onEdit: (item: GalleryItem) => void;
   onDelete: (item: GalleryItem) => void;
@@ -250,6 +292,9 @@ function CategorySection({
   onContextMenuAssign: (itemIndex: number, category: string | null) => void;
   onContextMenuNewCategory: (itemIndex: number) => void;
   onContextMenuDelete: (itemIndex: number) => void;
+  upscalers: Upscaler[];
+  selectedCount: number;
+  onContextMenuUpscale: (upscaler: string) => void;
   categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
   onSelectCategory: (select: boolean) => void;
 }) {
@@ -287,6 +332,7 @@ function CategorySection({
       onDragOver={showHeader ? handleDragOver : undefined}
       onDragLeave={showHeader ? handleDragLeave : undefined}
       onDrop={showHeader ? handleDrop : undefined}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onBackgroundMouseDown(); }}
       className={`rounded-lg p-1 -m-1 transition-colors duration-150 ${
         isDragOver ? "bg-blue-500/10 ring-2 ring-blue-500/60 ring-inset" : ""
       }`}
@@ -318,7 +364,10 @@ function CategorySection({
         </div>
       )}
       {!collapsed && (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+        <div
+          className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) onBackgroundMouseDown(); }}
+        >
           {items.map((item) => (
             <GalleryThumbnail
               key={item.index}
@@ -332,6 +381,10 @@ function CategorySection({
               onContextMenuAssign={onContextMenuAssign}
               onContextMenuNewCategory={onContextMenuNewCategory}
               onContextMenuDelete={onContextMenuDelete}
+              upscalers={upscalers}
+              selectedCount={selectedCount}
+              onContextMenuUpscale={onContextMenuUpscale}
+              onContextMenuSelect={onContextMenuSelect}
             />
           ))}
         </div>
@@ -557,11 +610,13 @@ function ImagePreview({
   item,
   x,
   y,
+  captionType,
   onClose,
 }: {
   item: GalleryItem;
   x: number;
   y: number;
+  captionType?: string;
   onClose: () => void;
 }) {
   const PAD = 16;
@@ -577,10 +632,13 @@ function ImagePreview({
 
   useEffect(() => {
     api.getItem(item.index).then((mediaItem) => {
-      const first = mediaItem.captions[0]?.content ?? null;
-      setCaption(first && first.trim() ? first : null);
+      const entry = captionType
+        ? mediaItem.captions.find((c) => c.caption_type === captionType)
+        : mediaItem.captions[0];
+      const content = entry?.content ?? null;
+      setCaption(content && content.trim() ? content : null);
     });
-  }, [item.index]);
+  }, [item.index, captionType]);
 
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
@@ -590,7 +648,7 @@ function ImagePreview({
         onClick={(e) => e.stopPropagation()}
       >
         <img
-          src={getMediaUrl(item.index)}
+          src={`${getMediaUrl(item.index)}&t=${item.thumb_token}`}
           alt={item.filename}
           style={{ maxWidth: MAX, maxHeight: MAX, display: "block" }}
         />
@@ -625,6 +683,11 @@ export default function GalleryGrid() {
     queryKey: ["gallery", "all", total],
     queryFn: () => api.getGallery(0, total),
     enabled: !!session?.datasetInfo && total > 0,
+  });
+
+  const { data: upscalers = [] } = useQuery({
+    queryKey: ["upscalers"],
+    queryFn: () => api.getUpscalers(),
   });
 
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
@@ -688,6 +751,19 @@ export default function GalleryGrid() {
     setSelectedIndices(new Set());
     lastSelectedRef.current = null;
   }, []);
+
+  const handleContextMenuSelect = useCallback(
+    (index: number, shiftKey: boolean, ctrlKey: boolean) => {
+      if (selectedIndices.has(index)) return;
+      if (shiftKey || ctrlKey) {
+        toggleSelect(index, shiftKey);
+        return;
+      }
+      setSelectedIndices(new Set([index]));
+      lastSelectedRef.current = index;
+    },
+    [selectedIndices, toggleSelect]
+  );
 
   const handleSelectCategory = useCallback((items: GalleryItem[], select: boolean) => {
     setSelectedIndices((prev) => {
@@ -788,6 +864,32 @@ export default function GalleryGrid() {
         );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to assign category");
+      }
+    },
+    [selectedIndices, queryClient]
+  );
+
+  const handleContextMenuUpscale = useCallback(
+    async (upscaler: string) => {
+      const indices = Array.from(selectedIndices);
+      if (indices.length === 0) return;
+      const toastId = toast.loading(`Upscaling 0/${indices.length}...`);
+      let done = 0;
+      try {
+        for (const idx of indices) {
+          await api.upscale(idx, upscaler);
+          await api.saveUpscaled(idx);
+          done++;
+          toast.loading(`Upscaling ${done}/${indices.length}...`, { id: toastId });
+        }
+        toast.success(`Upscaled ${done} image${done === 1 ? "" : "s"}`, { id: toastId });
+      } catch (err) {
+        toast.error(
+          `Upscale failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
+          { id: toastId }
+        );
+      } finally {
+        queryClient.invalidateQueries({ queryKey: ["gallery"] });
       }
     },
     [selectedIndices, queryClient]
@@ -917,7 +1019,10 @@ export default function GalleryGrid() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-8">
+        <div
+          className="flex flex-col gap-8 min-h-[40vh]"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) clearSelection(); }}
+        >
           {grouped.map(([category, items]) => {
             const categoryKey = category ?? "__uncategorized__";
             const selectedCount = items.filter((item) => selectedIndices.has(item.index)).length;
@@ -945,6 +1050,11 @@ export default function GalleryGrid() {
                 onContextMenuAssign={handleContextMenuAssign}
                 onContextMenuNewCategory={handleContextMenuNewCategory}
                 onContextMenuDelete={handleContextMenuDelete}
+                upscalers={upscalers}
+                selectedCount={selectionCount}
+                onContextMenuUpscale={handleContextMenuUpscale}
+                onContextMenuSelect={handleContextMenuSelect}
+                onBackgroundMouseDown={clearSelection}
                 categoryCheckState={categoryCheckState}
                 onSelectCategory={(select) => handleSelectCategory(items, select)}
               />
