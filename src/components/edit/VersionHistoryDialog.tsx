@@ -5,10 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, getMediaUrl } from "@/lib/api";
 import { History, RotateCcw, Trash2, Eye } from "lucide-react";
+import CompareSlider from "./CompareSlider";
 import type { ImageVersion } from "@/lib/types";
-import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 
 interface VersionHistoryDialogProps {
@@ -16,6 +16,7 @@ interface VersionHistoryDialogProps {
   onOpenChange: (open: boolean) => void;
   index: number;
   onRestored: () => void;
+  refreshKey?: number;
 }
 
 export default function VersionHistoryDialog({
@@ -23,12 +24,10 @@ export default function VersionHistoryDialog({
   onOpenChange,
   index,
   onRestored,
+  refreshKey = 0,
 }: VersionHistoryDialogProps) {
   const queryClient = useQueryClient();
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const session = activeProjectId
-    ? useSessionStore((s) => s.getProjectSession(activeProjectId))
-    : null;
   const [previewVersion, setPreviewVersion] = useState<ImageVersion | null>(null);
 
   const { data: versions, isLoading } = useQuery({
@@ -45,6 +44,7 @@ export default function VersionHistoryDialog({
       onOpenChange(false);
       onRestored();
       queryClient.invalidateQueries({ queryKey: ["versions", index] });
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (e) => {
       toast.error(e instanceof Error ? e.message : "Restore failed");
@@ -91,7 +91,7 @@ export default function VersionHistoryDialog({
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text truncate">
-                      {v.operation}
+                      Before {v.operation}
                     </p>
                     <p className="text-xs text-text-muted">
                       {v.original_width && v.original_height
@@ -151,13 +151,12 @@ export default function VersionHistoryDialog({
           </DialogTitle>
         </DialogHeader>
         {previewUrl ? (
-          <div className="flex justify-center">
-            <img
-              src={previewUrl}
-              alt={`Version ${previewVersion?.operation}`}
-              className="max-w-full max-h-[75vh] object-contain rounded"
-            />
-          </div>
+          <CompareSlider
+            leftUrl={previewUrl}
+            rightUrl={`${getMediaUrl(index)}&v=${refreshKey}`}
+            leftLabel={previewVersion ? `Before ${previewVersion.operation}` : "Version"}
+            rightLabel="Current"
+          />
         ) : null}
         <div className="flex justify-between items-center">
           <p className="text-sm text-text-muted">

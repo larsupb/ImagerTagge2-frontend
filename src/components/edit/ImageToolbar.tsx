@@ -95,12 +95,14 @@ const revertMutation = useMutation({
       }
       const latestVersion = allVersions[0];
       await api.restoreVersion(latestVersion.id, index);
+      await api.deleteVersion(latestVersion.id);
     },
     onSuccess: () => {
       toast.success("Reverted to previous version");
       onRefresh();
       bumpRefreshKey();
       queryClient.invalidateQueries({ queryKey: ["versions", index] });
+      queryClient.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (e) => {
       toast.error(e instanceof Error ? e.message : "Revert failed");
