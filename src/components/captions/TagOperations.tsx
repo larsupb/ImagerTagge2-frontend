@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,35 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
   const [renameValue, setRenameValue] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => api.getCategories(),
+  });
+  const allCategories = categoriesData ?? [];
+  const categoryOptions = [...allCategories, "Uncategorized"];
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const categoriesInited = useRef(false);
+
+  useEffect(() => {
+    if (categoriesData && !categoriesInited.current) {
+      setSelectedCategories(new Set([...categoriesData, "Uncategorized"]));
+      categoriesInited.current = true;
+    }
+  }, [categoriesData]);
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  // undefined = apply to all images (backend default); otherwise the selected subset
+  const categoriesArg = (): string[] | undefined =>
+    selectedCategories.size === categoryOptions.length ? undefined : Array.from(selectedCategories);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["tagCloud"] });
@@ -60,7 +89,7 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
   const handleAppend = async () => {
     if (!appendTag.trim()) return;
     try {
-      const result = await api.appendTag(appendTag.trim(), captionType);
+      const result = await api.appendTag(appendTag.trim(), captionType, categoriesArg());
       toast.success(`Appended to ${(result as { modified: number }).modified} captions`);
       setAppendTag("");
       refresh();
@@ -72,7 +101,7 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
   const handlePrepend = async () => {
     if (!prependTag.trim()) return;
     try {
-      const result = await api.prependTag(prependTag.trim(), captionType);
+      const result = await api.prependTag(prependTag.trim(), captionType, categoriesArg());
       toast.success(`Prepended to ${(result as { modified: number }).modified} captions`);
       setPrependTag("");
       refresh();
@@ -151,33 +180,72 @@ export default function TagOperations({ captionType, selectedTags }: TagOperatio
         </div>
       </div>
 
-      <div className="bg-surface rounded-lg border border-border p-4">
-        <h4 className="text-sm font-medium text-text mb-3">Append Tag</h4>
-        <div className="flex gap-2 items-center">
-          <Input
-            value={appendTag}
-            onChange={(e) => setAppendTag(e.target.value)}
-            placeholder="Tag to append..."
-            className="flex-1 text-sm"
-          />
-          <Button variant="default" size="sm" onClick={handleAppend} disabled={!appendTag.trim()}>
-            Append
-          </Button>
-        </div>
-      </div>
+      <div className="bg-surface rounded-lg border border-border p-4 flex flex-col gap-4">
+        <h4 className="text-sm font-medium text-text">Add Tags by Category</h4>
 
-      <div className="bg-surface rounded-lg border border-border p-4">
-        <h4 className="text-sm font-medium text-text mb-3">Prepend Tag</h4>
-        <div className="flex gap-2 items-center">
-          <Input
-            value={prependTag}
-            onChange={(e) => setPrependTag(e.target.value)}
-            placeholder="Tag to prepend..."
-            className="flex-1 text-sm"
-          />
-          <Button variant="default" size="sm" onClick={handlePrepend} disabled={!prependTag.trim()}>
-            Prepend
-          </Button>
+        <div>
+          <p className="text-xs text-text-muted mb-2">
+            Categories — limit Append/Prepend to these (all selected = all images)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {categoryOptions.map((cat) => (
+              <label key={cat} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <Checkbox
+                  checked={selectedCategories.has(cat)}
+                  onCheckedChange={() => toggleCategory(cat)}
+                />
+                {cat}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedCategories(new Set(categoryOptions))}
+            >
+              Select All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedCategories(new Set())}
+            >
+              Deselect All
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-4 flex flex-col gap-3">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Append Tag</label>
+            <div className="flex gap-2 items-center">
+              <Input
+                value={appendTag}
+                onChange={(e) => setAppendTag(e.target.value)}
+                placeholder="Tag to append..."
+                className="flex-1 text-sm"
+              />
+              <Button variant="default" size="sm" onClick={handleAppend} disabled={!appendTag.trim()}>
+                Append
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Prepend Tag</label>
+            <div className="flex gap-2 items-center">
+              <Input
+                value={prependTag}
+                onChange={(e) => setPrependTag(e.target.value)}
+                placeholder="Tag to prepend..."
+                className="flex-1 text-sm"
+              />
+              <Button variant="default" size="sm" onClick={handlePrepend} disabled={!prependTag.trim()}>
+                Prepend
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 

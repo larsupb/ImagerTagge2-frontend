@@ -238,11 +238,11 @@ export const api = {
   removeTags: (tags: string[], captionType = "tags") =>
     apiFetch("/api/captions/tags/remove", { method: "POST", body: JSON.stringify({ tags, caption_type: captionType }) }),
 
-  appendTag: (tag: string, captionType = "tags") =>
-    apiFetch("/api/captions/tags/append", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType }) }),
+  appendTag: (tag: string, captionType = "tags", categories?: string[]) =>
+    apiFetch("/api/captions/tags/append", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType, categories }) }),
 
-  prependTag: (tag: string, captionType = "tags") =>
-    apiFetch("/api/captions/tags/prepend", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType }) }),
+  prependTag: (tag: string, captionType = "tags", categories?: string[]) =>
+    apiFetch("/api/captions/tags/prepend", { method: "POST", body: JSON.stringify({ tag, caption_type: captionType, categories }) }),
 
   cleanupTags: (captionType = "tags") =>
     apiFetch("/api/captions/tags/cleanup", { method: "POST", body: JSON.stringify({ caption_type: captionType }) }),
