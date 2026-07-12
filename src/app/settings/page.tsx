@@ -212,7 +212,7 @@ export default function SettingsPage() {
             </SelectTrigger>
             <SelectContent>
               {upscalers?.map((u) => (
-                <SelectItem key={(u.display_name ?? u.name)} value={(u.display_name ?? u.name)}>
+                <SelectItem key={u.name} value={u.name}>
                   {(u.display_name ?? u.name)} ({u.scale_factor}x)
                 </SelectItem>
               ))}
