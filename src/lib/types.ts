@@ -97,6 +97,10 @@ export interface Settings {
     base_url: string;
     model: string;
     prompt: string;
+    target_megapixels: number;
+    temperature: number;
+    top_p: number;
+    max_tokens: number;
   };
   llm_endpoint: {
     api_key: string;

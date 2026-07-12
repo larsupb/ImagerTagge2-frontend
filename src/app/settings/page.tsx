@@ -443,6 +443,83 @@ export default function SettingsPage() {
         </div>
 
         <div>
+          <label className="block text-sm text-text-secondary mb-1">
+            Resize Target (megapixels)
+          </label>
+          <Input
+            type="number"
+            step="0.5"
+            min="0.1"
+            value={localSettings.vlm_endpoint.target_megapixels ?? 1}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              const vlm_endpoint = { ...localSettings.vlm_endpoint, target_megapixels: v };
+              setLocalSettings({ ...localSettings, vlm_endpoint });
+              save("vlm_endpoint", vlm_endpoint);
+            }}
+            className="w-32"
+          />
+          <p className="text-xs text-text-secondary mt-1">
+            Images are resized to this size (aspect ratio preserved) before being sent to the VLM.
+          </p>
+        </div>
+
+        <div className="flex gap-4">
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Temperature</label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              max="2"
+              value={localSettings.vlm_endpoint.temperature ?? 0.3}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                const vlm_endpoint = { ...localSettings.vlm_endpoint, temperature: v };
+                setLocalSettings({ ...localSettings, vlm_endpoint });
+                save("vlm_endpoint", vlm_endpoint);
+              }}
+              className="w-28"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Top P</label>
+            <Input
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              value={localSettings.vlm_endpoint.top_p ?? 0.9}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                const vlm_endpoint = { ...localSettings.vlm_endpoint, top_p: v };
+                setLocalSettings({ ...localSettings, vlm_endpoint });
+                save("vlm_endpoint", vlm_endpoint);
+              }}
+              className="w-28"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Max Tokens</label>
+            <Input
+              type="number"
+              step="64"
+              min="1"
+              value={localSettings.vlm_endpoint.max_tokens ?? 512}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                const vlm_endpoint = { ...localSettings.vlm_endpoint, max_tokens: v };
+                setLocalSettings({ ...localSettings, vlm_endpoint });
+                save("vlm_endpoint", vlm_endpoint);
+              }}
+              className="w-28"
+            />
+          </div>
+        </div>
+
+        <div>
           <label className="block text-sm text-text-secondary mb-1">Prompt</label>
           <textarea
             value={localSettings.vlm_endpoint.prompt}
