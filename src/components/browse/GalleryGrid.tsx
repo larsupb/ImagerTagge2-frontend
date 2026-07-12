@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare } from "lucide-react";
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { GalleryItem, GalleryResponse, Upscaler } from "@/lib/types";
+import type { GalleryItem, GalleryResponse, Upscaler, Tagger } from "@/lib/types";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -731,6 +731,17 @@ export default function GalleryGrid() {
     queryFn: () => api.getUpscalers(),
   });
 
+  const { data: taggersResponse } = useQuery({
+    queryKey: ["taggers"],
+    queryFn: () => api.getTaggers(),
+  });
+  const taggers = taggersResponse?.taggers ?? [];
+
+  const { data: sessionSettings } = useQuery({
+    queryKey: ["sessionSettings"],
+    queryFn: () => api.getSessionSettings(),
+  });
+
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
     if (!data?.items) return [];
     const map = new Map<string | null, GalleryItem[]>();
@@ -934,6 +945,37 @@ export default function GalleryGrid() {
       }
     },
     [selectedIndices, queryClient]
+  );
+
+  const handleContextMenuCaption = useCallback(
+    async (tagger: string) => {
+      const indices = Array.from(selectedIndices);
+      if (indices.length === 0) return;
+      const targetType =
+        sessionSettings?.active_tag_type ?? captionTypes[0] ?? "tags";
+      const toastId = toast.loading(`Captioning 0/${indices.length}...`);
+      let done = 0;
+      try {
+        for (const idx of indices) {
+          const { caption } = await api.generateCaption(idx, tagger);
+          await api.saveCaption(idx, caption, targetType);
+          done++;
+          toast.loading(`Captioning ${done}/${indices.length}...`, { id: toastId });
+        }
+        toast.success(
+          `Captioned ${done} image${done === 1 ? "" : "s"} into "${targetType}"`,
+          { id: toastId }
+        );
+      } catch (err) {
+        toast.error(
+          `Captioning failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
+          { id: toastId }
+        );
+      } finally {
+        queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      }
+    },
+    [selectedIndices, sessionSettings, captionTypes, queryClient]
   );
 
   const handleContextMenuNewCategory = useCallback((itemIndex: number) => {
