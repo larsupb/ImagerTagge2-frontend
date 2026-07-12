@@ -679,6 +679,47 @@ export default function GalleryGrid() {
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
+  const storageKey = activeProjectId
+    ? `browse:previewCaptionType:${activeProjectId}`
+    : null;
+
+  const { data: captionTypes = [] } = useQuery({
+    queryKey: ["captionTypes"],
+    queryFn: () => api.getCaptionTypes(),
+  });
+
+  const { data: firstItem } = useQuery({
+    queryKey: ["previewDefaultCaptionType"],
+    queryFn: () => api.getItem(0),
+    enabled: captionTypes.length > 0 && total > 0,
+  });
+
+  const [previewCaptionType, setPreviewCaptionType] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (previewCaptionType || captionTypes.length === 0) return;
+
+    const stored = storageKey ? localStorage.getItem(storageKey) : null;
+    if (stored && captionTypes.includes(stored)) {
+      setPreviewCaptionType(stored);
+      return;
+    }
+
+    const active = firstItem?.captions.find((c) => c.is_active)?.caption_type;
+    setPreviewCaptionType(
+      active && captionTypes.includes(active) ? active : captionTypes[0]
+    );
+  }, [captionTypes, firstItem, storageKey, previewCaptionType]);
+
+  const handlePreviewTypeChange = useCallback(
+    (value: string | null) => {
+      if (!value) return;
+      setPreviewCaptionType(value);
+      if (storageKey) localStorage.setItem(storageKey, value);
+    },
+    [storageKey]
+  );
+
   const { data, isLoading } = useQuery({
     queryKey: ["gallery", "all", total],
     queryFn: () => api.getGallery(0, total),
@@ -974,6 +1015,20 @@ export default function GalleryGrid() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm text-text-secondary">{total} images</span>
+          {captionTypes.length > 0 && previewCaptionType && (
+            <Select value={previewCaptionType} onValueChange={handlePreviewTypeChange}>
+              <SelectTrigger className="h-7 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {captionTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {selectionCount > 0 && (
             <>
               <span className="text-text-muted text-sm">·</span>
@@ -1068,6 +1123,7 @@ export default function GalleryGrid() {
           item={previewState.item}
           x={previewState.x}
           y={previewState.y}
+          captionType={previewCaptionType ?? undefined}
           onClose={closePreview}
         />
       )}
