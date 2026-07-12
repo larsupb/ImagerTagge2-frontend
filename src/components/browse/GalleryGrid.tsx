@@ -70,8 +70,10 @@ function GalleryThumbnail({
   onContextMenuNewCategory,
   onContextMenuDelete,
   upscalers,
+  taggers,
   selectedCount,
   onContextMenuUpscale,
+  onContextMenuCaption,
   onContextMenuSelect,
 }: {
   item: GalleryItem;
@@ -86,8 +88,10 @@ function GalleryThumbnail({
   onContextMenuNewCategory: (itemIndex: number) => void;
   onContextMenuDelete: (itemIndex: number) => void;
   upscalers: Upscaler[];
+  taggers: Tagger[];
   selectedCount: number;
   onContextMenuUpscale: (upscaler: string) => void;
+  onContextMenuCaption: (tagger: string) => void;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -268,8 +272,10 @@ function CategorySection({
   onContextMenuNewCategory,
   onContextMenuDelete,
   upscalers,
+  taggers,
   selectedCount,
   onContextMenuUpscale,
+  onContextMenuCaption,
   onContextMenuSelect,
   onBackgroundMouseDown,
   categoryCheckState,
@@ -293,8 +299,10 @@ function CategorySection({
   onContextMenuNewCategory: (itemIndex: number) => void;
   onContextMenuDelete: (itemIndex: number) => void;
   upscalers: Upscaler[];
+  taggers: Tagger[];
   selectedCount: number;
   onContextMenuUpscale: (upscaler: string) => void;
+  onContextMenuCaption: (tagger: string) => void;
   categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
   onSelectCategory: (select: boolean) => void;
 }) {
@@ -382,8 +390,10 @@ function CategorySection({
               onContextMenuNewCategory={onContextMenuNewCategory}
               onContextMenuDelete={onContextMenuDelete}
               upscalers={upscalers}
+              taggers={taggers}
               selectedCount={selectedCount}
               onContextMenuUpscale={onContextMenuUpscale}
+              onContextMenuCaption={onContextMenuCaption}
               onContextMenuSelect={onContextMenuSelect}
             />
           ))}
@@ -1148,8 +1158,10 @@ export default function GalleryGrid() {
                 onContextMenuNewCategory={handleContextMenuNewCategory}
                 onContextMenuDelete={handleContextMenuDelete}
                 upscalers={upscalers}
+                taggers={taggers}
                 selectedCount={selectionCount}
                 onContextMenuUpscale={handleContextMenuUpscale}
+                onContextMenuCaption={handleContextMenuCaption}
                 onContextMenuSelect={handleContextMenuSelect}
                 onBackgroundMouseDown={clearSelection}
                 categoryCheckState={categoryCheckState}
