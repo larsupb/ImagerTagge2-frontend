@@ -9,6 +9,7 @@ import ProgressLog from "./ProgressLog";
 import { HoverImage } from "@/components/shared/HoverImage";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import {
   Palette,
   Eye,
   Sun,
+  History,
 } from "lucide-react";
 
 interface OperationCardProps {
@@ -74,6 +76,8 @@ function OperationCard({ icon, title, description, checked, onCheckedChange, chi
 export default function BatchForm() {
   const [rename, setRename] = useState(false);
   const [renameOffset, setRenameOffset] = useState(0);
+  const [revertOriginal, setRevertOriginal] = useState(false);
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [upscale, setUpscale] = useState(false);
   const [batchUpscaler, setBatchUpscaler] = useState("");
   const [mask, setMask] = useState(false);
@@ -177,6 +181,7 @@ export default function BatchForm() {
     setLogEntries([]);
     try {
       const result = await api.startBatchTask({
+        revert_original: revertOriginal,
         rename,
         rename_offset: renameOffset,
         upscale,
@@ -227,7 +232,7 @@ export default function BatchForm() {
     }
   };
 
-  const hasAnyOperation = rename || upscale || mask || caption || colorMatch || whiteBalance;
+  const hasAnyOperation = revertOriginal || rename || upscale || mask || caption || colorMatch || whiteBalance;
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -256,6 +261,20 @@ export default function BatchForm() {
             />
           </div>
         </OperationCard>
+
+        <OperationCard
+          icon={<History className="w-5 h-5" />}
+          title="Revert to original version"
+          description="Restore every image from its earliest backup and clear its version history."
+          checked={revertOriginal}
+          onCheckedChange={(checked) => {
+            if (checked) {
+              setRevertConfirmOpen(true);
+            } else {
+              setRevertOriginal(false);
+            }
+          }}
+        />
 
         <OperationCard
           icon={<ImagePlus className="w-5 h-5" />}
@@ -549,6 +568,17 @@ export default function BatchForm() {
       </div>
 
       <ProgressLog entries={logEntries} isRunning={isRunning} />
+
+      <ConfirmDialog
+        open={revertConfirmOpen}
+        title="Revert to original version"
+        message="Every image in this batch will be restored to its very first version, and all stored versions will be deleted. This cannot be undone."
+        onConfirm={() => {
+          setRevertOriginal(true);
+          setRevertConfirmOpen(false);
+        }}
+        onCancel={() => setRevertConfirmOpen(false)}
+      />
     </div>
   );
 }
