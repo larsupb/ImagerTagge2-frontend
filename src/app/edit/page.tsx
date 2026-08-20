@@ -60,27 +60,8 @@ export default function EditPage() {
   const setCurrentIndex = useSessionStore((s) => s.setCurrentIndex);
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
 
-  const handleCaptionTextChange = useCallback((text: string) => setCaptionText(text), []);
-
-  const handleSetActiveType = useCallback(
-    (type: string) => {
-      setActiveType(type);
-      if (!activeProjectId) return;
-      useSessionStore.getState().setActiveTagType(activeProjectId, type);
-      const projectId = useProjectStore.getState().projects.find(
-        (p) => p.session_id === activeProjectId
-      )?.project_id;
-      if (projectId) {
-        api.setProjectConfig(projectId, { active_tag_type: type });
-      }
-    },
-    [activeProjectId]
-  );
-
   const queryClient = useQueryClient();
   const [captionDirty, setCaptionDirty] = useState(false);
-  const [activeType, setActiveType] = useState(session?.activeTagType ?? "tag");
-  const [captionText, setCaptionText] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
@@ -348,10 +329,6 @@ export default function EditPage() {
         onCategoryChange={(category) => {
           setCurrentItem(activeProjectId, { ...currentItem, category });
         }}
-        activeType={activeType}
-        onTypeChange={handleSetActiveType}
-        captions={currentItem.captions ?? []}
-        captionText={captionText}
       />
 
       <CaptionEditor
@@ -359,13 +336,11 @@ export default function EditPage() {
         index={safeIndex}
         savedCaption={currentItem.caption}
         captions={currentItem.captions ?? []}
-        activeType={activeType}
         onCaptionChange={async (caption) => {
           setCurrentItem(activeProjectId, { ...currentItem, caption });
           await loadItem(safeIndex);
         }}
         onDirtyChange={setCaptionDirty}
-        onTextChange={handleCaptionTextChange}
         getUnsavedText={(getter) => {
           getUnsavedTextRef.current = getter;
         }}

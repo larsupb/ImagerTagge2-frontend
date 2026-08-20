@@ -8,6 +8,7 @@ import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { useJobsUiStore } from "@/stores/jobsUi";
+import { useActiveTagType } from "@/hooks/useActiveTagType";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -722,45 +723,19 @@ export default function GalleryGrid() {
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
-  const storageKey = activeProjectId
-    ? `browse:previewCaptionType:${activeProjectId}`
-    : null;
-
   const { data: captionTypes = [] } = useQuery({
     queryKey: ["captionTypes"],
     queryFn: () => api.getCaptionTypes(),
   });
 
-  const { data: firstItem } = useQuery({
-    queryKey: ["previewDefaultCaptionType"],
-    queryFn: () => api.getItem(0),
-    enabled: captionTypes.length > 0 && total > 0,
-  });
-
-  const [previewCaptionType, setPreviewCaptionType] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (previewCaptionType || captionTypes.length === 0) return;
-
-    const stored = storageKey ? localStorage.getItem(storageKey) : null;
-    if (stored && captionTypes.includes(stored)) {
-      setPreviewCaptionType(stored);
-      return;
-    }
-
-    const active = firstItem?.captions.find((c) => c.is_active)?.caption_type;
-    setPreviewCaptionType(
-      active && captionTypes.includes(active) ? active : captionTypes[0]
-    );
-  }, [captionTypes, firstItem, storageKey, previewCaptionType]);
+  const { activeTagType: previewCaptionType, setActiveTagType } =
+    useActiveTagType(captionTypes);
 
   const handlePreviewTypeChange = useCallback(
     (value: string | null) => {
-      if (!value) return;
-      setPreviewCaptionType(value);
-      if (storageKey) localStorage.setItem(storageKey, value);
+      if (value) setActiveTagType(value);
     },
-    [storageKey]
+    [setActiveTagType]
   );
 
   const { data, isLoading } = useQuery({
@@ -779,11 +754,6 @@ export default function GalleryGrid() {
     queryFn: () => api.getTaggers(),
   });
   const taggers = taggersResponse?.taggers ?? [];
-
-  const { data: sessionSettings } = useQuery({
-    queryKey: ["sessionSettings"],
-    queryFn: () => api.getSessionSettings(),
-  });
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
@@ -1000,14 +970,13 @@ export default function GalleryGrid() {
 
   const runCaption = useCallback(
     (tagger: string, prompt?: string) => {
-      const targetType =
-        sessionSettings?.active_tag_type ?? captionTypes[0] ?? "tags";
+      const targetType = previewCaptionType ?? "tags";
       return queueJob(
         { caption: true, tagger, prompt, caption_type: targetType },
-        "captioning"
+        `captioning into "${targetType}"`
       );
     },
-    [queueJob, sessionSettings, captionTypes]
+    [queueJob, previewCaptionType]
   );
 
   const handleContextMenuCaption = useCallback(
