@@ -296,10 +296,10 @@ export const api = {
     apiFetch(`/api/categories/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
   // Tagging
-  generateCaption: (index: number, tagger: string) =>
+  generateCaption: (index: number, tagger: string, prompt?: string) =>
     apiFetch<{ caption: string }>("/api/tagging/generate", {
       method: "POST",
-      body: JSON.stringify({ index, tagger }),
+      body: JSON.stringify({ index, tagger, prompt }),
     }),
 
   // Processing

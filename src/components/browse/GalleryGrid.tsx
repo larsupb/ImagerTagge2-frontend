@@ -13,6 +13,7 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -27,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { GalleryItem, GalleryResponse, Upscaler, Tagger } from "@/lib/types";
+import type { GalleryItem, GalleryResponse, Upscaler, Tagger, Settings } from "@/lib/types";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,6 +49,14 @@ import {
 
 const NONE = "__none__";
 const NEW = "__new__";
+
+const PROMPT_TAGGER_DEFAULTS: Record<
+  string,
+  (settings: Settings | undefined) => string
+> = {
+  "vlm-tagger": (settings) => settings?.vlm_endpoint?.prompt ?? "",
+  florence: (settings) => settings?.florence_settings?.prompt ?? "",
+};
 
 function getIssues(item: GalleryItem): string[] {
   const issues: string[] = [];
@@ -708,6 +717,7 @@ export default function GalleryGrid() {
   const [newCatDialog, setNewCatDialog] = useState<{ open: boolean; itemIndex: number | null }>({ open: false, itemIndex: null });
   const [newCatInput, setNewCatInput] = useState("");
   const [pendingDeleteIndices, setPendingDeleteIndices] = useState<number[] | null>(null);
+  const [promptDialog, setPromptDialog] = useState<{ open: boolean; tagger: string | null; prompt: string }>({ open: false, tagger: null, prompt: "" });
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
@@ -772,6 +782,11 @@ export default function GalleryGrid() {
   const { data: sessionSettings } = useQuery({
     queryKey: ["sessionSettings"],
     queryFn: () => api.getSessionSettings(),
+  });
+
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
   });
 
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
@@ -979,8 +994,8 @@ export default function GalleryGrid() {
     [selectedIndices, queryClient]
   );
 
-  const handleContextMenuCaption = useCallback(
-    async (tagger: string) => {
+  const runCaption = useCallback(
+    async (tagger: string, prompt?: string) => {
       const indices = Array.from(selectedIndices);
       if (indices.length === 0) return;
       const targetType =
@@ -989,7 +1004,7 @@ export default function GalleryGrid() {
       let done = 0;
       try {
         for (const idx of indices) {
-          const { caption } = await api.generateCaption(idx, tagger);
+          const { caption } = await api.generateCaption(idx, tagger, prompt);
           await api.saveCaption(idx, caption, targetType);
           done++;
           toast.loading(`Captioning ${done}/${indices.length}...`, { id: toastId });
@@ -1009,6 +1024,25 @@ export default function GalleryGrid() {
     },
     [selectedIndices, sessionSettings, captionTypes, queryClient]
   );
+
+  const handleContextMenuCaption = useCallback(
+    (tagger: string) => {
+      const defaultPrompt = PROMPT_TAGGER_DEFAULTS[tagger]?.(settings);
+      if (defaultPrompt !== undefined) {
+        setPromptDialog({ open: true, tagger, prompt: defaultPrompt });
+        return;
+      }
+      runCaption(tagger);
+    },
+    [settings, runCaption]
+  );
+
+  const handlePromptDialogRun = useCallback(() => {
+    if (!promptDialog.tagger) return;
+    const { tagger, prompt } = promptDialog;
+    setPromptDialog({ open: false, tagger: null, prompt: "" });
+    runCaption(tagger, prompt);
+  }, [promptDialog, runCaption]);
 
   const handleContextMenuNewCategory = useCallback((itemIndex: number) => {
     setNewCatInput("");
@@ -1242,6 +1276,43 @@ export default function GalleryGrid() {
             </Button>
             <Button onClick={handleNewCatCreate} disabled={!newCatInput.trim()}>
               Create &amp; assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={promptDialog.open}
+        onOpenChange={(open) => setPromptDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>
+              {taggers.find((t) => t.id === promptDialog.tagger)?.name ?? "Tagger"} prompt
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-muted">
+            Edit the prompt sent to the model for the {selectedIndices.size} selected
+            item{selectedIndices.size === 1 ? "" : "s"}. This applies to this run only.
+          </p>
+          <Textarea
+            rows={6}
+            placeholder="Prompt..."
+            value={promptDialog.prompt}
+            onChange={(e) =>
+              setPromptDialog((prev) => ({ ...prev, prompt: e.target.value }))
+            }
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPromptDialog({ open: false, tagger: null, prompt: "" })}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handlePromptDialogRun} disabled={!promptDialog.prompt.trim()}>
+              Run
             </Button>
           </DialogFooter>
         </DialogContent>
