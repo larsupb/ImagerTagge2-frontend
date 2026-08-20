@@ -968,61 +968,42 @@ export default function GalleryGrid() {
     [selectedIndices, queryClient]
   );
 
-  const handleContextMenuUpscale = useCallback(
-    async (upscaler: string) => {
+  const queueJob = useCallback(
+    async (options: Record<string, unknown>, description: string) => {
       const indices = Array.from(selectedIndices);
       if (indices.length === 0) return;
-      const toastId = toast.loading(`Upscaling 0/${indices.length}...`);
-      let done = 0;
       try {
-        for (const idx of indices) {
-          await api.upscale(idx, upscaler);
-          await api.saveUpscaled(idx);
-          done++;
-          toast.loading(`Upscaling ${done}/${indices.length}...`, { id: toastId });
-        }
-        toast.success(`Upscaled ${done} image${done === 1 ? "" : "s"}`, { id: toastId });
-      } catch (err) {
-        toast.error(
-          `Upscale failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
-          { id: toastId }
+        await api.startBatchTask({ ...options, indices });
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        toast.success(
+          `Queued ${description} for ${indices.length} image${indices.length === 1 ? "" : "s"}`,
+          {
+            description: "Track it on the jobs page.",
+            action: { label: "View jobs", onClick: () => router.push("/jobs") },
+          }
         );
-      } finally {
-        queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to queue job");
       }
     },
-    [selectedIndices, queryClient]
+    [selectedIndices, queryClient, router]
+  );
+
+  const handleContextMenuUpscale = useCallback(
+    (upscaler: string) => queueJob({ upscale: true, upscaler }, "upscale"),
+    [queueJob]
   );
 
   const runCaption = useCallback(
-    async (tagger: string, prompt?: string) => {
-      const indices = Array.from(selectedIndices);
-      if (indices.length === 0) return;
+    (tagger: string, prompt?: string) => {
       const targetType =
         sessionSettings?.active_tag_type ?? captionTypes[0] ?? "tags";
-      const toastId = toast.loading(`Captioning 0/${indices.length}...`);
-      let done = 0;
-      try {
-        for (const idx of indices) {
-          const { caption } = await api.generateCaption(idx, tagger, prompt);
-          await api.saveCaption(idx, caption, targetType);
-          done++;
-          toast.loading(`Captioning ${done}/${indices.length}...`, { id: toastId });
-        }
-        toast.success(
-          `Captioned ${done} image${done === 1 ? "" : "s"} into "${targetType}"`,
-          { id: toastId }
-        );
-      } catch (err) {
-        toast.error(
-          `Captioning failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
-          { id: toastId }
-        );
-      } finally {
-        queryClient.invalidateQueries({ queryKey: ["gallery"] });
-      }
+      return queueJob(
+        { caption: true, tagger, prompt, caption_type: targetType },
+        "captioning"
+      );
     },
-    [selectedIndices, sessionSettings, captionTypes, queryClient]
+    [queueJob, sessionSettings, captionTypes]
   );
 
   const handleContextMenuCaption = useCallback(
