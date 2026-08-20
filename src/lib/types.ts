@@ -221,17 +221,32 @@ export interface TaskLogEntry {
   message: string;
 }
 
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
 export interface BatchTask {
   task_id: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  name: string;
+  operation: string;
+  project_name: string | null;
+  status: JobStatus;
   progress: number;
   current_index: number;
+  current_filename: string | null;
   total: number;
   logs: TaskLogEntry[];
-  started_at: string;
+  created_at: string;
+  started_at: string | null;
   completed_at: string | null;
   error: string | null;
 }
+
+export type Job = BatchTask;
 
 export interface DedupImageInfo {
   index: number;

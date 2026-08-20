@@ -16,6 +16,7 @@ import type {
   ImageVersion,
   ColorMatchPreviewResult,
   BatchTask,
+  Job,
   DedupScanResponse,
 } from "./types";
 import { toast } from "sonner";
@@ -425,6 +426,18 @@ export const api = {
     }
     return response.json();
   },
+
+  // Jobs
+  listJobs: () => apiFetch<Job[]>("/api/jobs"),
+
+  pauseJob: (jobId: string) =>
+    apiFetch<{ paused: boolean }>(`/api/jobs/${jobId}/pause`, { method: "POST" }),
+
+  resumeJob: (jobId: string) =>
+    apiFetch<{ paused: boolean }>(`/api/jobs/${jobId}/resume`, { method: "POST" }),
+
+  cancelJob: (jobId: string) =>
+    apiFetch<{ cancelled: boolean }>(`/api/jobs/${jobId}`, { method: "DELETE" }),
 
   analyzeBuckets: (resolution = 1024, step = 64, maxSteps = 4, categories?: string[]) =>
     apiFetch<BucketResult>("/api/batch/analyze-buckets", {
