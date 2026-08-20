@@ -85,7 +85,7 @@ function ParamControl({
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-text focus:outline-none focus:border-ring"
         >
-          {param.options?.map((opt) => (
+          {Array.from(new Set(param.options ?? [])).map((opt) => (
             <option key={opt} value={opt}>
               {opt}
             </option>
