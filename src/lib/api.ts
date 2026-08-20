@@ -163,10 +163,10 @@ export const api = {
     apiFetch<{ total_items: number }>(`/api/dataset/item/${index}`, { method: "DELETE" }),
 
   deleteItems: (indices: number[]) =>
-    apiFetch<{ total_items: number }>("/api/dataset/items/bulk", {
+    apiFetch<{ deleted: number; total_items: number }>("/api/dataset/items/bulk", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(indices),
+      body: JSON.stringify({ indices }),
     }),
 
   uploadImages: async (files: File[]): Promise<{ added: Array<{ index: number; filename: string }>; total_items: number }> => {
