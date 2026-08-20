@@ -7,6 +7,7 @@ import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, E
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
+import { useJobsUiStore } from "@/stores/jobsUi";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -978,15 +979,18 @@ export default function GalleryGrid() {
         toast.success(
           `Queued ${description} for ${indices.length} image${indices.length === 1 ? "" : "s"}`,
           {
-            description: "Track it on the jobs page.",
-            action: { label: "View jobs", onClick: () => router.push("/jobs") },
+            description: "Track it from the jobs icon in the top bar.",
+            action: {
+              label: "View jobs",
+              onClick: () => useJobsUiStore.getState().open(),
+            },
           }
         );
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to queue job");
       }
     },
-    [selectedIndices, queryClient, router]
+    [selectedIndices, queryClient]
   );
 
   const handleContextMenuUpscale = useCallback(
