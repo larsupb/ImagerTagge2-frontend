@@ -291,6 +291,7 @@ export interface AttributeQueryItem {
   is_bookmarked: boolean;
   attributes: AttributeMap;
   captions: Record<string, string>;
+  category: string | null;
 }
 
 export interface AttributeQueryResponse {
