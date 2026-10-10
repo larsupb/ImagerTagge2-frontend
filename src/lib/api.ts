@@ -21,6 +21,7 @@ import type {
   AttributeFootprint,
   AttributeMap,
   AttributeQueryResponse,
+  SearchResponse,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -539,6 +540,15 @@ export const api = {
       `/api/attributes/classify?index=${index}`,
       { method: "POST" }
     ),
+
+  // Search
+  searchImages: (q: string, minScore = 0, limit = 200) => {
+    const params = new URLSearchParams({ q, min_score: String(minScore), limit: String(limit) });
+    return apiFetch<SearchResponse>(`/api/search?${params.toString()}`);
+  },
+
+  startIndexJob: () =>
+    apiFetch<{ task_id: string }>("/api/search/index", { method: "POST" }),
 
   // Media URLs
   mediaUrl: getMediaUrl,

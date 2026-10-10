@@ -108,6 +108,12 @@ export interface Settings {
     base_url: string;
     model: string;
   };
+  embedding_endpoint: {
+    base_url: string;
+    api_key: string;
+    model: string;
+    timeout?: number;
+  };
   comfyui?: {
     url?: string;
     api_token?: string;
@@ -297,4 +303,17 @@ export interface AttributeQueryItem {
 export interface AttributeQueryResponse {
   total: number;
   items: AttributeQueryItem[];
+}
+
+export interface SearchResult {
+  index: number;
+  filename: string;
+  score: number;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  indexed: number;
+  pending: number;
+  model: string;
 }
