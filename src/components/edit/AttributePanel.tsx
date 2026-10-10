@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { humanize } from "@/lib/utils";
 import type { AttributeMap } from "@/lib/types";
 import {
   Select,
@@ -76,7 +77,7 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
       <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
         {entries.map(([name, spec]) => (
           <div key={name} className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary min-w-fit">{name.replace(/_/g, " ")}</span>
+            <span className="text-sm text-text-secondary min-w-fit">{humanize(name)}</span>
             <Select
               value={attributes[name] ?? UNSET}
               onValueChange={(value) => handleChange(name, value)}
@@ -90,7 +91,7 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
                 </SelectItem>
                 {spec.values.map((v) => (
                   <SelectItem key={v} value={v}>
-                    {v.replace(/_/g, " ")}
+                    {humanize(v)}
                   </SelectItem>
                 ))}
               </SelectContent>

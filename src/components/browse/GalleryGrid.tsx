@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare } from "lucide-react";
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
+import { humanize } from "@/lib/utils";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { useJobsUiStore } from "@/stores/jobsUi";
@@ -187,10 +188,10 @@ function GalleryThumbnail({
                     return (
                       <span
                         key={key}
-                        title={`${key.replace(/_/g, " ")}: ${value.replace(/_/g, " ")}`}
+                        title={`${humanize(key)}: ${humanize(value)}`}
                         className="max-w-full truncate rounded bg-black/60 px-1 py-0.5 text-[10px] leading-none text-white"
                       >
-                        {value.replace(/_/g, " ")}
+                        {humanize(value)}
                       </span>
                     );
                   })}
@@ -826,6 +827,14 @@ export default function GalleryGrid() {
     [filteredItems]
   );
 
+  useEffect(() => {
+    const visible = new Set(allIndices);
+    setSelectedIndices((prev) => {
+      const next = new Set([...prev].filter((idx) => visible.has(idx)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [allIndices]);
+
   const flatItems = useMemo(
     () => grouped.flatMap(([, items]) => items),
     [grouped]
@@ -1131,7 +1140,7 @@ export default function GalleryGrid() {
           )}
           {Object.entries(attributeSchema ?? {}).map(([name, spec]) => (
             <div key={name} className="flex items-center gap-1.5">
-              <span className="text-xs text-text-secondary">{name.replace(/_/g, " ")}</span>
+              <span className="text-xs text-text-secondary">{humanize(name)}</span>
               <Select
                 value={attrFilters[name] ?? ATTR_ALL}
                 onValueChange={(value) =>
@@ -1153,7 +1162,7 @@ export default function GalleryGrid() {
                   </SelectItem>
                   {spec.values.map((v) => (
                     <SelectItem key={v} value={v}>
-                      {v.replace(/_/g, " ")}
+                      {humanize(v)}
                     </SelectItem>
                   ))}
                 </SelectContent>
