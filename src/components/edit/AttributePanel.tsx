@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { AttributeMap } from "@/lib/types";
 import {
@@ -24,8 +25,10 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
     queryFn: () => api.getAttributeSchema(),
   });
   const [attributes, setAttributes] = useState<AttributeMap | null>(null);
+  const filenameRef = useRef(filename);
 
   useEffect(() => {
+    filenameRef.current = filename;
     let cancelled = false;
     setAttributes(null);
     api
@@ -34,7 +37,7 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
         if (!cancelled) setAttributes(res.attributes);
       })
       .catch((err) => {
-        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load attributes");
         if (!cancelled) setAttributes({});
       });
     return () => {
@@ -43,9 +46,11 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
   }, [filename]);
 
   const handleChange = async (attr: string, value: string | null) => {
+    const target = filename;
     const next = !value || value === UNSET ? null : value;
     try {
       await api.setAttributes(filename, { [attr]: next });
+      if (target !== filenameRef.current) return;
       setAttributes((prev) => {
         if (!prev) return prev;
         const copy = { ...prev };
@@ -71,7 +76,7 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
       <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
         {entries.map(([name, spec]) => (
           <div key={name} className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary min-w-fit">{name}</span>
+            <span className="text-sm text-text-secondary min-w-fit">{name.replace(/_/g, " ")}</span>
             <Select
               value={attributes[name] ?? UNSET}
               onValueChange={(value) => handleChange(name, value)}
