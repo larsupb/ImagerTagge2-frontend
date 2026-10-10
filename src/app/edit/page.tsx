@@ -324,15 +324,16 @@ export default function EditPage() {
         />
       )}
 
-      <CategorySelector
-        index={safeIndex}
-        category={currentItem.category}
-        onCategoryChange={(category) => {
-          setCurrentItem(activeProjectId, { ...currentItem, category });
-        }}
-      />
-
-      <AttributePanel filename={currentItem.filename} />
+      <div className="bg-surface rounded-lg border border-border px-4 py-2.5 flex items-center gap-3">
+        <CategorySelector
+          index={safeIndex}
+          category={currentItem.category}
+          onCategoryChange={(category) => {
+            setCurrentItem(activeProjectId, { ...currentItem, category });
+          }}
+        />
+        <AttributePanel filename={currentItem.filename} />
+      </div>
 
       <CaptionEditor
         caption={currentItem.caption}

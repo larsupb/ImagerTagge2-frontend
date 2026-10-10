@@ -72,11 +72,11 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
   const count = Object.keys(attributes).length;
 
   return (
-    <details className="bg-surface rounded-lg border border-border px-4 py-2.5">
+    <details className="relative">
       <summary className="flex h-7 w-fit cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs text-text-secondary [&::-webkit-details-marker]:hidden">
         Attributes{count > 0 ? ` (${count})` : ""}
       </summary>
-      <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="absolute z-20 mt-1 w-80 max-h-96 overflow-y-auto rounded-md border border-border bg-background p-3 shadow-md grid grid-cols-2 gap-2">
         {entries.map(([name, spec]) => (
           <div key={name} className="flex flex-col gap-1">
             <span className="text-xs text-text-secondary">{humanize(name)}</span>

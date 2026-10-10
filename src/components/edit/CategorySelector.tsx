@@ -108,7 +108,7 @@ export default function CategorySelector({ index, category, onCategoryChange }: 
   };
 
   return (
-    <div className="bg-surface rounded-lg border border-border px-4 py-2.5 flex items-center gap-3">
+    <div className="flex items-center gap-3">
       <span className="text-sm text-text-secondary min-w-fit">Category</span>
 
       <Select value={category ?? NONE} onValueChange={handleSelect}>
