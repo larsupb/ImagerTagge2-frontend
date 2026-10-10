@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, getCurrentSessionId } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { BucketResult, BatchTask } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -71,11 +71,6 @@ export default function ExportForm() {
     setSelectedCategories(cats);
   }, [allCategories]);
 
-  const { data: datasetInfo } = useQuery({
-    queryKey: ["datasetInfo"],
-    queryFn: () => api.getDatasetInfo(),
-  });
-
   const { data: captionTypes = [] } = useQuery({
     queryKey: ["captionTypes"],
     queryFn: () => api.getCaptionTypes(),
@@ -95,7 +90,7 @@ export default function ExportForm() {
     }
   }, [firstItem, captionTypes]);
 
-  const { data: task, isLoading: isPolling } = useQuery<BatchTask>({
+  const { data: task } = useQuery<BatchTask>({
     queryKey: ["exportTask", currentTaskId],
     queryFn: () => currentTaskId ? api.getExportStatus(currentTaskId) : Promise.resolve(null as unknown as BatchTask),
     enabled: !!currentTaskId,
@@ -120,6 +115,10 @@ export default function ExportForm() {
         handleDownload();
       } else if (task.status === "failed") {
         toast.error(task.error || "Export failed");
+        setIsExporting(false);
+        setCurrentTaskId(null);
+      } else if (task.status === "cancelled") {
+        toast.info("Export cancelled");
         setIsExporting(false);
         setCurrentTaskId(null);
       }
@@ -367,6 +366,12 @@ export default function ExportForm() {
           {isExporting ? "Exporting..." : "Export"}
         </Button>
       </div>
+
+      {isExporting && task?.status === "pending" && (
+        <p className="text-sm text-text-secondary mt-4">
+          Queued behind running jobs
+        </p>
+      )}
 
       {logEntry && (
         <div className="mt-4">

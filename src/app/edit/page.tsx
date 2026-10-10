@@ -16,6 +16,7 @@ import VideoPlayer from "@/components/edit/VideoPlayer";
 import NavigationBar from "@/components/edit/NavigationBar";
 import CaptionEditor from "@/components/edit/CaptionEditor";
 import CategorySelector from "@/components/edit/CategorySelector";
+import AttributePanel from "@/components/edit/AttributePanel";
 import ImageToolbar from "@/components/edit/ImageToolbar";
 import PaintToolbar from "@/components/edit/PaintToolbar";
 import MaskToolbar from "@/components/edit/MaskToolbar";
@@ -60,27 +61,8 @@ export default function EditPage() {
   const setCurrentIndex = useSessionStore((s) => s.setCurrentIndex);
   const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
 
-  const handleCaptionTextChange = useCallback((text: string) => setCaptionText(text), []);
-
-  const handleSetActiveType = useCallback(
-    (type: string) => {
-      setActiveType(type);
-      if (!activeProjectId) return;
-      useSessionStore.getState().setActiveTagType(activeProjectId, type);
-      const projectId = useProjectStore.getState().projects.find(
-        (p) => p.session_id === activeProjectId
-      )?.project_id;
-      if (projectId) {
-        api.setProjectConfig(projectId, { active_tag_type: type });
-      }
-    },
-    [activeProjectId]
-  );
-
   const queryClient = useQueryClient();
   const [captionDirty, setCaptionDirty] = useState(false);
-  const [activeType, setActiveType] = useState(session?.activeTagType ?? "tag");
-  const [captionText, setCaptionText] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
@@ -342,30 +324,27 @@ export default function EditPage() {
         />
       )}
 
-      <CategorySelector
-        index={safeIndex}
-        category={currentItem.category}
-        onCategoryChange={(category) => {
-          setCurrentItem(activeProjectId, { ...currentItem, category });
-        }}
-        activeType={activeType}
-        onTypeChange={handleSetActiveType}
-        captions={currentItem.captions ?? []}
-        captionText={captionText}
-      />
+      <div className="bg-surface rounded-lg border border-border px-4 py-2.5 flex items-center gap-3">
+        <CategorySelector
+          index={safeIndex}
+          category={currentItem.category}
+          onCategoryChange={(category) => {
+            setCurrentItem(activeProjectId, { ...currentItem, category });
+          }}
+        />
+        <AttributePanel filename={currentItem.filename} />
+      </div>
 
       <CaptionEditor
         caption={currentItem.caption}
         index={safeIndex}
         savedCaption={currentItem.caption}
         captions={currentItem.captions ?? []}
-        activeType={activeType}
         onCaptionChange={async (caption) => {
           setCurrentItem(activeProjectId, { ...currentItem, caption });
           await loadItem(safeIndex);
         }}
         onDirtyChange={setCaptionDirty}
-        onTextChange={handleCaptionTextChange}
         getUnsavedText={(getter) => {
           getUnsavedTextRef.current = getter;
         }}

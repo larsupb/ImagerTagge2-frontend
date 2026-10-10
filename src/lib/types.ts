@@ -50,6 +50,7 @@ export interface GalleryItem {
   width: number | null;
   height: number | null;
   category: string | null;
+  attributes?: AttributeMap;
 }
 
 export interface GalleryResponse {
@@ -221,17 +222,32 @@ export interface TaskLogEntry {
   message: string;
 }
 
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
 export interface BatchTask {
   task_id: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  name: string;
+  operation: string;
+  project_name: string | null;
+  status: JobStatus;
   progress: number;
   current_index: number;
+  current_filename: string | null;
   total: number;
   logs: TaskLogEntry[];
-  started_at: string;
+  created_at: string;
+  started_at: string | null;
   completed_at: string | null;
   error: string | null;
 }
+
+export type Job = BatchTask;
 
 export interface DedupImageInfo {
   index: number;
@@ -253,3 +269,32 @@ export interface DedupScanResponse {
 }
 
 export type PaintTool = "pencil" | "quad" | "eraser";
+
+export interface AttributeSpec {
+  applies_to: "all" | "person";
+  values: string[];
+}
+
+export type AttributeSchema = Record<string, AttributeSpec>;
+
+export type AttributeMap = Record<string, string>;
+
+export type AttributeFootprint = Record<string, Record<string, number>>;
+
+export interface AttributeQueryItem {
+  id: number;
+  index: number | null;
+  filename: string;
+  width: number | null;
+  height: number | null;
+  file_size: number | null;
+  is_bookmarked: boolean;
+  attributes: AttributeMap;
+  captions: Record<string, string>;
+  category: string | null;
+}
+
+export interface AttributeQueryResponse {
+  total: number;
+  items: AttributeQueryItem[];
+}

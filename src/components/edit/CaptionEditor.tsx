@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useActiveTagType } from "@/hooks/useActiveTagType";
 import { Button } from "@/components/ui/button";
 import type { Tagger, CaptionEntry } from "@/lib/types";
 import {
@@ -48,6 +49,16 @@ export default function CaptionEditor({
   const [newTypeInput, setNewTypeInput] = useState("");
   const [newTypeOpen, setNewTypeOpen] = useState(false);
 
+  const { activeTagType, setActiveTagType } = useActiveTagType();
+
+  // Follow a type picked on another page, when this item has that type.
+  useEffect(() => {
+    if (!activeTagType || activeTagType === activeType) return;
+    if (captions?.some((c) => c.caption_type === activeTagType)) {
+      setActiveType(activeTagType);
+    }
+  }, [activeTagType, activeType, captions]);
+
   const { data: taggersResponse } = useQuery({
     queryKey: ["taggers"],
     queryFn: () => api.getTaggers(),
@@ -88,15 +99,21 @@ export default function CaptionEditor({
       setSavedContent(map);
       const currentTypeExists = captions.some((c) => c.caption_type === activeType);
       if (!currentTypeExists) {
+        const shared = captions.find((c) => c.caption_type === activeTagType);
         const active = captions.find((c) => c.is_active);
-        setActiveType(active?.caption_type ?? captions[0]?.caption_type ?? "")
+        setActiveType(
+          shared?.caption_type ??
+            active?.caption_type ??
+            captions[0]?.caption_type ??
+            ""
+        );
       }
     } else {
       setSavedContent({});
       setActiveType("");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captions]);
+  }, [captions, activeTagType]);
 
   useEffect(() => {
     if (captions) {
@@ -116,6 +133,7 @@ export default function CaptionEditor({
       setSavedContent((prev) => ({ ...prev, [activeType]: text }));
     }
     setActiveType(type);
+    setActiveTagType(type);
     const entry = captions?.find((c) => c.caption_type === type);
     const newContent = entry?.content ?? "";
     setText(newContent);
@@ -127,6 +145,7 @@ export default function CaptionEditor({
     setNewTypeOpen(false);
     setNewTypeInput("");
     setActiveType(trimmed);
+    setActiveTagType(trimmed);
     setText("");
   };
 
