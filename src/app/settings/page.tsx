@@ -536,6 +536,53 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="Semantic search (embeddings)">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Base URL</label>
+          <Input
+            value={localSettings.embedding_endpoint?.base_url ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, base_url: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+            placeholder="http://localhost:11434/v1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Model</label>
+          <Input
+            value={localSettings.embedding_endpoint?.model ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, model: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">API Key</label>
+          <Input
+            type="password"
+            value={localSettings.embedding_endpoint?.api_key ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, api_key: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+            placeholder="Leave empty for local endpoints"
+          />
+        </div>
+      </Section>
+
       <Section title="LLM Endpoint (PromptGen)">
         <div>
           <label className="block text-sm text-text-secondary mb-1">Host (Base URL)</label>
