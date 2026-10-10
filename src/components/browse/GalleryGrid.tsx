@@ -53,7 +53,6 @@ import {
 const NONE = "__none__";
 const NEW = "__new__";
 const ATTR_ALL = "__all__";
-const ATTR_UNSET = "__unset__";
 const BADGE_ATTRIBUTES = ["shot_type", "framing"];
 
 const PROMPT_TAGGER_DEFAULTS: Record<
@@ -742,6 +741,7 @@ export default function GalleryGrid() {
   const [pendingDeleteIndices, setPendingDeleteIndices] = useState<number[] | null>(null);
   const [promptDialog, setPromptDialog] = useState<{ open: boolean; tagger: string | null; prompt: string }>({ open: false, tagger: null, prompt: "" });
   const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
+  const attrFiltersRef = useRef<HTMLDetailsElement>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
@@ -792,11 +792,7 @@ export default function GalleryGrid() {
     const active = Object.entries(attrFilters);
     if (active.length === 0) return items;
     return items.filter((item) =>
-      active.every(([name, value]) =>
-        value === ATTR_UNSET
-          ? !(name in (item.attributes ?? {}))
-          : item.attributes?.[name] === value
-      )
+      active.every(([name, value]) => item.attributes?.[name] === value)
     );
   }, [data?.items, attrFilters]);
 
@@ -826,6 +822,15 @@ export default function GalleryGrid() {
     () => filteredItems.map((i) => i.index),
     [filteredItems]
   );
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      const el = attrFiltersRef.current;
+      if (el?.open && !el.contains(e.target as Node)) el.open = false;
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
 
   useEffect(() => {
     const visible = new Set(allIndices);
@@ -1140,7 +1145,7 @@ export default function GalleryGrid() {
           )}
           {Object.keys(attributeSchema ?? {}).length > 0 && (
             <div className="relative">
-              <details>
+              <details ref={attrFiltersRef}>
                 <summary className="flex h-7 cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs [&::-webkit-details-marker]:hidden">
                   Filters{Object.keys(attrFilters).length > 0 ? ` (${Object.keys(attrFilters).length})` : ""}
                 </summary>
@@ -1165,9 +1170,6 @@ export default function GalleryGrid() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={ATTR_ALL}>All</SelectItem>
-                            <SelectItem value={ATTR_UNSET}>
-                              <span className="text-text-muted">-- unset --</span>
-                            </SelectItem>
                             {spec.values.map((v) => (
                               <SelectItem key={v} value={v}>
                                 {humanize(v)}
@@ -1178,6 +1180,14 @@ export default function GalleryGrid() {
                       </div>
                     ))}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full text-xs text-text-secondary"
+                    onClick={() => setAttrFilters({})}
+                  >
+                    Reset
+                  </Button>
                 </div>
               </details>
             </div>
