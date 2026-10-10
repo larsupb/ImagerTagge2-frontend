@@ -268,3 +268,31 @@ export interface DedupScanResponse {
 }
 
 export type PaintTool = "pencil" | "quad" | "eraser";
+
+export interface AttributeSpec {
+  applies_to: "all" | "person";
+  values: string[];
+}
+
+export type AttributeSchema = Record<string, AttributeSpec>;
+
+export type AttributeMap = Record<string, string>;
+
+export type AttributeFootprint = Record<string, Record<string, number>>;
+
+export interface AttributeQueryItem {
+  id: number;
+  index: number | null;
+  filename: string;
+  width: number | null;
+  height: number | null;
+  file_size: number | null;
+  is_bookmarked: boolean;
+  attributes: AttributeMap;
+  captions: Record<string, string>;
+}
+
+export interface AttributeQueryResponse {
+  total: number;
+  items: AttributeQueryItem[];
+}

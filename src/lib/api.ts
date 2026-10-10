@@ -18,6 +18,10 @@ import type {
   BatchTask,
   Job,
   DedupScanResponse,
+  AttributeSchema,
+  AttributeFootprint,
+  AttributeMap,
+  AttributeQueryResponse,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -503,6 +507,33 @@ export const api = {
         user_prompt: userPrompt
       }),
     }),
+
+  // Attributes
+  getAttributeSchema: () => apiFetch<AttributeSchema>("/api/attributes/schema"),
+
+  getAttributeFootprint: () => apiFetch<AttributeFootprint>("/api/attributes/footprint"),
+
+  getAttributes: (filename: string) =>
+    apiFetch<{ filename: string; attributes: AttributeMap }>(
+      `/api/attributes?filename=${encodeURIComponent(filename)}`
+    ),
+
+  queryAttributes: (filters: Record<string, string>, limit = 100, offset = 0) => {
+    const params = new URLSearchParams({ ...filters, limit: String(limit), offset: String(offset) });
+    return apiFetch<AttributeQueryResponse>(`/api/attributes/query?${params.toString()}`);
+  },
+
+  setAttributes: (filename: string, attributes: Record<string, string | null>) =>
+    apiFetch<{ id: number; filename: string; attributes: AttributeMap }>("/api/attributes", {
+      method: "PUT",
+      body: JSON.stringify({ filename, attributes }),
+    }),
+
+  classifyAttributes: (tagger: string, onlyMissing: boolean) =>
+    apiFetch<{ task_id: string }>(
+      `/api/attributes/classify?tagger=${encodeURIComponent(tagger)}&only_missing=${onlyMissing}`,
+      { method: "POST" }
+    ),
 
   // Media URLs
   mediaUrl: getMediaUrl,
