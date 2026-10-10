@@ -50,6 +50,7 @@ export interface GalleryItem {
   width: number | null;
   height: number | null;
   category: string | null;
+  attributes?: AttributeMap;
 }
 
 export interface GalleryResponse {

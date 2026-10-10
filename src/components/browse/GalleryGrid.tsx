@@ -51,6 +51,9 @@ import {
 
 const NONE = "__none__";
 const NEW = "__new__";
+const ATTR_ALL = "__all__";
+const ATTR_UNSET = "__unset__";
+const BADGE_ATTRIBUTES = ["shot_type", "framing"];
 
 const PROMPT_TAGGER_DEFAULTS: Record<
   string,
@@ -175,6 +178,23 @@ function GalleryThumbnail({
                 <span className="absolute top-1.5 right-1.5 text-yellow-400 group-hover:opacity-0 transition-opacity pointer-events-none">
                   <Star className="w-3.5 h-3.5 fill-current" />
                 </span>
+              )}
+              {BADGE_ATTRIBUTES.some((key) => item.attributes?.[key]) && (
+                <div className="absolute bottom-1.5 left-1.5 flex flex-col items-start gap-0.5 max-w-[calc(100%-12px)] pointer-events-none">
+                  {BADGE_ATTRIBUTES.map((key) => {
+                    const value = item.attributes?.[key];
+                    if (!value) return null;
+                    return (
+                      <span
+                        key={key}
+                        title={`${key.replace(/_/g, " ")}: ${value.replace(/_/g, " ")}`}
+                        className="max-w-full truncate rounded bg-black/60 px-1 py-0.5 text-[10px] leading-none text-white"
+                      >
+                        {value.replace(/_/g, " ")}
+                      </span>
+                    );
+                  })}
+                </div>
               )}
 
               <div
@@ -720,6 +740,7 @@ export default function GalleryGrid() {
   const [newCatInput, setNewCatInput] = useState("");
   const [pendingDeleteIndices, setPendingDeleteIndices] = useState<number[] | null>(null);
   const [promptDialog, setPromptDialog] = useState<{ open: boolean; tagger: string | null; prompt: string }>({ open: false, tagger: null, prompt: "" });
+  const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
@@ -760,10 +781,27 @@ export default function GalleryGrid() {
     queryFn: () => api.getSettings(),
   });
 
+  const { data: attributeSchema } = useQuery({
+    queryKey: ["attribute-schema"],
+    queryFn: () => api.getAttributeSchema(),
+  });
+
+  const filteredItems = useMemo(() => {
+    const items = data?.items ?? [];
+    const active = Object.entries(attrFilters);
+    if (active.length === 0) return items;
+    return items.filter((item) =>
+      active.every(([name, value]) =>
+        value === ATTR_UNSET
+          ? !(name in (item.attributes ?? {}))
+          : item.attributes?.[name] === value
+      )
+    );
+  }, [data?.items, attrFilters]);
+
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
-    if (!data?.items) return [];
     const map = new Map<string | null, GalleryItem[]>();
-    for (const item of data.items) {
+    for (const item of filteredItems) {
       const key = item.category ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
@@ -774,7 +812,7 @@ export default function GalleryGrid() {
       if (a === null || b === null) return 0;
       return a.localeCompare(b);
     });
-  }, [data?.items]);
+  }, [filteredItems]);
 
   const hasCategories = grouped.some(([cat]) => cat !== null);
 
@@ -784,8 +822,8 @@ export default function GalleryGrid() {
   );
 
   const allIndices = useMemo(
-    () => data?.items.map((i) => i.index) ?? [],
-    [data?.items]
+    () => filteredItems.map((i) => i.index),
+    [filteredItems]
   );
 
   const flatItems = useMemo(
@@ -1091,6 +1129,37 @@ export default function GalleryGrid() {
               </SelectContent>
             </Select>
           )}
+          {Object.entries(attributeSchema ?? {}).map(([name, spec]) => (
+            <div key={name} className="flex items-center gap-1.5">
+              <span className="text-xs text-text-secondary">{name.replace(/_/g, " ")}</span>
+              <Select
+                value={attrFilters[name] ?? ATTR_ALL}
+                onValueChange={(value) =>
+                  setAttrFilters((prev) => {
+                    const next = { ...prev };
+                    if (!value || value === ATTR_ALL) delete next[name];
+                    else next[name] = value;
+                    return next;
+                  })
+                }
+              >
+                <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ATTR_ALL}>All</SelectItem>
+                  <SelectItem value={ATTR_UNSET}>
+                    <span className="text-text-muted">-- unset --</span>
+                  </SelectItem>
+                  {spec.values.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
           {selectionCount > 0 && (
             <>
               <span className="text-text-muted text-sm">·</span>
