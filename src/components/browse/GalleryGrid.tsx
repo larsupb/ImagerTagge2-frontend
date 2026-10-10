@@ -3,16 +3,21 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare, X } from "lucide-react";
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
+import { humanize } from "@/lib/utils";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
+import { useJobsUiStore } from "@/stores/jobsUi";
+import { useActiveTagType } from "@/hooks/useActiveTagType";
+import { useTaskPolling } from "@/hooks/useTaskPolling";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -27,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { GalleryItem, GalleryResponse, Upscaler, Tagger } from "@/lib/types";
+import type { GalleryItem, GalleryResponse, Upscaler, Tagger, Settings } from "@/lib/types";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,6 +53,16 @@ import {
 
 const NONE = "__none__";
 const NEW = "__new__";
+const ATTR_ALL = "__all__";
+const BADGE_ATTRIBUTES = ["shot_type", "framing"];
+
+const PROMPT_TAGGER_DEFAULTS: Record<
+  string,
+  (settings: Settings | undefined) => string
+> = {
+  "vlm-tagger": (settings) => settings?.vlm_endpoint?.prompt ?? "",
+  florence: (settings) => settings?.florence_settings?.prompt ?? "",
+};
 
 function getIssues(item: GalleryItem): string[] {
   const issues: string[] = [];
@@ -75,6 +90,7 @@ function GalleryThumbnail({
   onContextMenuUpscale,
   onContextMenuCaption,
   onContextMenuSelect,
+  score,
 }: {
   item: GalleryItem;
   isSelected: boolean;
@@ -92,6 +108,7 @@ function GalleryThumbnail({
   selectedCount: number;
   onContextMenuUpscale: (upscaler: string) => void;
   onContextMenuCaption: (tagger: string) => void;
+  score?: number;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -155,6 +172,12 @@ function GalleryThumbnail({
                 <div className="absolute inset-0 bg-blue-500/40 pointer-events-none" />
               )}
 
+              {score !== undefined && (
+                <span className="absolute top-1 left-1 z-10 rounded bg-black/60 px-1 py-0.5 text-[10px] leading-none text-white tabular-nums pointer-events-none">
+                  {score.toFixed(2)}
+                </span>
+              )}
+
               {hasIssues && (
                 <span className="absolute top-1.5 left-1.5 text-danger">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -164,6 +187,23 @@ function GalleryThumbnail({
                 <span className="absolute top-1.5 right-1.5 text-yellow-400 group-hover:opacity-0 transition-opacity pointer-events-none">
                   <Star className="w-3.5 h-3.5 fill-current" />
                 </span>
+              )}
+              {BADGE_ATTRIBUTES.some((key) => item.attributes?.[key]) && (
+                <div className="absolute bottom-1.5 left-1.5 flex flex-col items-start gap-0.5 max-w-[calc(100%-12px)] pointer-events-none">
+                  {BADGE_ATTRIBUTES.map((key) => {
+                    const value = item.attributes?.[key];
+                    if (!value) return null;
+                    return (
+                      <span
+                        key={key}
+                        title={`${humanize(key)}: ${humanize(value)}`}
+                        className="max-w-full truncate rounded bg-black/60 px-1 py-0.5 text-[10px] leading-none text-white"
+                      >
+                        {humanize(value)}
+                      </span>
+                    );
+                  })}
+                </div>
               )}
 
               <div
@@ -302,6 +342,7 @@ function CategorySection({
   onBackgroundMouseDown,
   categoryCheckState,
   onSelectCategory,
+  scores,
 }: {
   name: string | null;
   items: GalleryItem[];
@@ -327,6 +368,7 @@ function CategorySection({
   onContextMenuCaption: (tagger: string) => void;
   categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
   onSelectCategory: (select: boolean) => void;
+  scores: Map<number, number> | null;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -417,6 +459,7 @@ function CategorySection({
               onContextMenuUpscale={onContextMenuUpscale}
               onContextMenuCaption={onContextMenuCaption}
               onContextMenuSelect={onContextMenuSelect}
+              score={scores?.get(item.index)}
             />
           ))}
         </div>
@@ -708,48 +751,28 @@ export default function GalleryGrid() {
   const [newCatDialog, setNewCatDialog] = useState<{ open: boolean; itemIndex: number | null }>({ open: false, itemIndex: null });
   const [newCatInput, setNewCatInput] = useState("");
   const [pendingDeleteIndices, setPendingDeleteIndices] = useState<number[] | null>(null);
+  const [promptDialog, setPromptDialog] = useState<{ open: boolean; tagger: string | null; prompt: string }>({ open: false, tagger: null, prompt: "" });
+  const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
+  const attrFiltersRef = useRef<HTMLDetailsElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [indexTaskId, setIndexTaskId] = useState<string | null>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
-
-  const storageKey = activeProjectId
-    ? `browse:previewCaptionType:${activeProjectId}`
-    : null;
 
   const { data: captionTypes = [] } = useQuery({
     queryKey: ["captionTypes"],
     queryFn: () => api.getCaptionTypes(),
   });
 
-  const { data: firstItem } = useQuery({
-    queryKey: ["previewDefaultCaptionType"],
-    queryFn: () => api.getItem(0),
-    enabled: captionTypes.length > 0 && total > 0,
-  });
-
-  const [previewCaptionType, setPreviewCaptionType] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (previewCaptionType || captionTypes.length === 0) return;
-
-    const stored = storageKey ? localStorage.getItem(storageKey) : null;
-    if (stored && captionTypes.includes(stored)) {
-      setPreviewCaptionType(stored);
-      return;
-    }
-
-    const active = firstItem?.captions.find((c) => c.is_active)?.caption_type;
-    setPreviewCaptionType(
-      active && captionTypes.includes(active) ? active : captionTypes[0]
-    );
-  }, [captionTypes, firstItem, storageKey, previewCaptionType]);
+  const { activeTagType: previewCaptionType, setActiveTagType } =
+    useActiveTagType(captionTypes);
 
   const handlePreviewTypeChange = useCallback(
     (value: string | null) => {
-      if (!value) return;
-      setPreviewCaptionType(value);
-      if (storageKey) localStorage.setItem(storageKey, value);
+      if (value) setActiveTagType(value);
     },
-    [storageKey]
+    [setActiveTagType]
   );
 
   const { data, isLoading } = useQuery({
@@ -769,15 +792,85 @@ export default function GalleryGrid() {
   });
   const taggers = taggersResponse?.taggers ?? [];
 
-  const { data: sessionSettings } = useQuery({
-    queryKey: ["sessionSettings"],
-    queryFn: () => api.getSessionSettings(),
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
   });
 
+  const { data: attributeSchema } = useQuery({
+    queryKey: ["attribute-schema"],
+    queryFn: () => api.getAttributeSchema(),
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => setSubmittedSearch(searchQuery), 500);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchStats } = useQuery({
+    queryKey: ["search-stats"],
+    queryFn: () => api.searchImages(""),
+  });
+
+  const searchQ = useQuery({
+    queryKey: ["search", submittedSearch],
+    queryFn: () => api.searchImages(submittedSearch),
+    enabled: submittedSearch.trim().length > 0,
+    retry: false,
+  });
+
+  const { task: indexTask } = useTaskPolling(indexTaskId);
+
+  const searchScores = useMemo(
+    () => new Map((searchQ.data?.results ?? []).map((r) => [r.index, r.score])),
+    [searchQ.data]
+  );
+
+  const searchItems = useMemo<GalleryItem[] | null>(() => {
+    if (!submittedSearch.trim()) return null;
+    const res = searchQ.data?.results;
+    if (!res) return [];
+    const byIndex = new Map((data?.items ?? []).map((it) => [it.index, it]));
+    return res
+      .map((r) => byIndex.get(r.index))
+      .filter((it): it is GalleryItem => !!it);
+  }, [submittedSearch, searchQ.data, data?.items]);
+
+  useEffect(() => {
+    if (searchQ.error) toast.error(searchQ.error.message);
+  }, [searchQ.error]);
+
+  useEffect(() => {
+    if (!indexTaskId || !indexTask) return;
+    if (indexTask.status === "pending" || indexTask.status === "running" || indexTask.status === "paused") return;
+    setIndexTaskId(null);
+    queryClient.invalidateQueries({ queryKey: ["search-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["search"] });
+  }, [indexTaskId, indexTask, queryClient]);
+
+  const handleIndex = useCallback(async () => {
+    try {
+      const res = await api.startIndexJob();
+      setIndexTaskId(res.task_id);
+      toast.success(`Indexing ${searchStats?.pending ?? 0} captions`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start indexing");
+    }
+  }, [searchStats?.pending]);
+
+  const filteredItems = useMemo(() => {
+    const items = searchItems ?? data?.items ?? [];
+    const active = Object.entries(attrFilters);
+    if (active.length === 0) return items;
+    return items.filter((item) =>
+      active.every(([name, value]) => item.attributes?.[name] === value)
+    );
+  }, [searchItems, data?.items, attrFilters]);
+
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
-    if (!data?.items) return [];
+    if (searchItems) return [[null, filteredItems]];
     const map = new Map<string | null, GalleryItem[]>();
-    for (const item of data.items) {
+    for (const item of filteredItems) {
       const key = item.category ?? null;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
@@ -788,7 +881,7 @@ export default function GalleryGrid() {
       if (a === null || b === null) return 0;
       return a.localeCompare(b);
     });
-  }, [data?.items]);
+  }, [filteredItems, searchItems]);
 
   const hasCategories = grouped.some(([cat]) => cat !== null);
 
@@ -798,9 +891,26 @@ export default function GalleryGrid() {
   );
 
   const allIndices = useMemo(
-    () => data?.items.map((i) => i.index) ?? [],
-    [data?.items]
+    () => filteredItems.map((i) => i.index),
+    [filteredItems]
   );
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      const el = attrFiltersRef.current;
+      if (el?.open && !el.contains(e.target as Node)) el.open = false;
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  useEffect(() => {
+    const visible = new Set(allIndices);
+    setSelectedIndices((prev) => {
+      const next = new Set([...prev].filter((idx) => visible.has(idx)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [allIndices]);
 
   const flatItems = useMemo(
     () => grouped.flatMap(([, items]) => items),
@@ -953,62 +1063,64 @@ export default function GalleryGrid() {
     [selectedIndices, queryClient]
   );
 
-  const handleContextMenuUpscale = useCallback(
-    async (upscaler: string) => {
+  const queueJob = useCallback(
+    async (options: Record<string, unknown>, description: string) => {
       const indices = Array.from(selectedIndices);
       if (indices.length === 0) return;
-      const toastId = toast.loading(`Upscaling 0/${indices.length}...`);
-      let done = 0;
       try {
-        for (const idx of indices) {
-          await api.upscale(idx, upscaler);
-          await api.saveUpscaled(idx);
-          done++;
-          toast.loading(`Upscaling ${done}/${indices.length}...`, { id: toastId });
-        }
-        toast.success(`Upscaled ${done} image${done === 1 ? "" : "s"}`, { id: toastId });
-      } catch (err) {
-        toast.error(
-          `Upscale failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
-          { id: toastId }
+        await api.startBatchTask({ ...options, indices });
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        toast.success(
+          `Queued ${description} for ${indices.length} image${indices.length === 1 ? "" : "s"}`,
+          {
+            description: "Track it from the jobs icon in the top bar.",
+            action: {
+              label: "View jobs",
+              onClick: () => useJobsUiStore.getState().open(),
+            },
+          }
         );
-      } finally {
-        queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to queue job");
       }
     },
     [selectedIndices, queryClient]
   );
 
-  const handleContextMenuCaption = useCallback(
-    async (tagger: string) => {
-      const indices = Array.from(selectedIndices);
-      if (indices.length === 0) return;
-      const targetType =
-        sessionSettings?.active_tag_type ?? captionTypes[0] ?? "tags";
-      const toastId = toast.loading(`Captioning 0/${indices.length}...`);
-      let done = 0;
-      try {
-        for (const idx of indices) {
-          const { caption } = await api.generateCaption(idx, tagger);
-          await api.saveCaption(idx, caption, targetType);
-          done++;
-          toast.loading(`Captioning ${done}/${indices.length}...`, { id: toastId });
-        }
-        toast.success(
-          `Captioned ${done} image${done === 1 ? "" : "s"} into "${targetType}"`,
-          { id: toastId }
-        );
-      } catch (err) {
-        toast.error(
-          `Captioning failed after ${done}/${indices.length}: ${err instanceof Error ? err.message : "error"}`,
-          { id: toastId }
-        );
-      } finally {
-        queryClient.invalidateQueries({ queryKey: ["gallery"] });
-      }
-    },
-    [selectedIndices, sessionSettings, captionTypes, queryClient]
+  const handleContextMenuUpscale = useCallback(
+    (upscaler: string) => queueJob({ upscale: true, upscaler }, "upscale"),
+    [queueJob]
   );
+
+  const runCaption = useCallback(
+    (tagger: string, prompt?: string) => {
+      const targetType = previewCaptionType ?? "tags";
+      return queueJob(
+        { caption: true, tagger, prompt, caption_type: targetType },
+        `captioning into "${targetType}"`
+      );
+    },
+    [queueJob, previewCaptionType]
+  );
+
+  const handleContextMenuCaption = useCallback(
+    (tagger: string) => {
+      const defaultPrompt = PROMPT_TAGGER_DEFAULTS[tagger]?.(settings);
+      if (defaultPrompt !== undefined) {
+        setPromptDialog({ open: true, tagger, prompt: defaultPrompt });
+        return;
+      }
+      runCaption(tagger);
+    },
+    [settings, runCaption]
+  );
+
+  const handlePromptDialogRun = useCallback(() => {
+    if (!promptDialog.tagger) return;
+    const { tagger, prompt } = promptDialog;
+    setPromptDialog({ open: false, tagger: null, prompt: "" });
+    runCaption(tagger, prompt);
+  }, [promptDialog, runCaption]);
 
   const handleContextMenuNewCategory = useCallback((itemIndex: number) => {
     setNewCatInput("");
@@ -1103,6 +1215,83 @@ export default function GalleryGrid() {
               </SelectContent>
             </Select>
           )}
+          {Object.keys(attributeSchema ?? {}).length > 0 && (
+            <div className="relative">
+              <details ref={attrFiltersRef}>
+                <summary className="flex h-7 cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs [&::-webkit-details-marker]:hidden">
+                  Filters{Object.keys(attrFilters).length > 0 ? ` (${Object.keys(attrFilters).length})` : ""}
+                </summary>
+                <div className="absolute z-20 mt-1 w-80 rounded-md border bg-background p-3 shadow-md">
+                  <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto">
+                    {Object.entries(attributeSchema ?? {}).map(([name, spec]) => (
+                      <div key={name} className="flex flex-col gap-1">
+                        <span className="text-xs text-text-secondary">{humanize(name)}</span>
+                        <Select
+                          value={attrFilters[name] ?? ATTR_ALL}
+                          onValueChange={(value) =>
+                            setAttrFilters((prev) => {
+                              const next = { ...prev };
+                              if (!value || value === ATTR_ALL) delete next[name];
+                              else next[name] = value;
+                              return next;
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-full text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ATTR_ALL}>All</SelectItem>
+                            {spec.values.map((v) => (
+                              <SelectItem key={v} value={v}>
+                                {humanize(v)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full text-xs text-text-secondary"
+                    onClick={() => setAttrFilters({})}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </details>
+            </div>
+          )}
+          <div className="relative">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Semantic search..."
+              className="h-7 w-48 text-xs pr-7"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {(searchStats?.pending ?? 0) > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleIndex}
+            >
+              Index {searchStats?.pending} captions
+            </Button>
+          )}
           {selectionCount > 0 && (
             <>
               <span className="text-text-muted text-sm">·</span>
@@ -1188,6 +1377,7 @@ export default function GalleryGrid() {
                 onBackgroundMouseDown={clearSelection}
                 categoryCheckState={categoryCheckState}
                 onSelectCategory={(select) => handleSelectCategory(items, select)}
+                scores={searchItems ? searchScores : null}
               />
             );
           })}
@@ -1242,6 +1432,43 @@ export default function GalleryGrid() {
             </Button>
             <Button onClick={handleNewCatCreate} disabled={!newCatInput.trim()}>
               Create &amp; assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={promptDialog.open}
+        onOpenChange={(open) => setPromptDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>
+              {taggers.find((t) => t.id === promptDialog.tagger)?.name ?? "Tagger"} prompt
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-muted">
+            Edit the prompt sent to the model for the {selectedIndices.size} selected
+            item{selectedIndices.size === 1 ? "" : "s"}. This applies to this run only.
+          </p>
+          <Textarea
+            rows={6}
+            placeholder="Prompt..."
+            value={promptDialog.prompt}
+            onChange={(e) =>
+              setPromptDialog((prev) => ({ ...prev, prompt: e.target.value }))
+            }
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPromptDialog({ open: false, tagger: null, prompt: "" })}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handlePromptDialogRun} disabled={!promptDialog.prompt.trim()}>
+              Run
             </Button>
           </DialogFooter>
         </DialogContent>

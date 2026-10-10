@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FolderOpen, X, Plus } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { Button } from "@/components/ui/button";
+import JobsIndicator from "@/components/jobs/JobsIndicator";
 import { toast } from "sonner";
 
 export default function ProjectTabs() {
@@ -35,7 +36,8 @@ export default function ProjectTabs() {
 
   return (
     <div className="flex flex-col border-b border-border bg-surface">
-      <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
         {projects.map((project) => {
           const isActive = project.session_id === activeProjectId;
           return (
@@ -78,6 +80,10 @@ export default function ProjectTabs() {
             Open Project
           </Button>
         )}
+        </div>
+        <div className="shrink-0 pl-2">
+          <JobsIndicator />
+        </div>
       </div>
       {showOpenDialog && (
         <div className="flex items-center gap-2 px-2 pb-2">

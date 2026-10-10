@@ -5,6 +5,7 @@ import { FolderOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useProjectStore } from "@/stores/projectStore";
+import { useActiveTagType } from "@/hooks/useActiveTagType";
 import { useSessionStore } from "@/stores/session";
 import EmptyState from "@/components/shared/EmptyState";
 import TagCloud from "@/components/captions/TagCloud";
@@ -18,13 +19,14 @@ export default function CaptionsPage() {
     : undefined;
   const { datasetInfo } = session ?? {};
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const { data: captionTypes = [] } = useQuery({
     queryKey: ["captionTypes"],
     queryFn: () => api.getCaptionTypes(),
     enabled: !!datasetInfo,
   });
+
+  const { activeTagType, setActiveTagType } = useActiveTagType(captionTypes);
 
   if (!activeProjectId) {
     return (
@@ -50,7 +52,7 @@ export default function CaptionsPage() {
     );
   }
 
-  const currentTab = activeTab && captionTypes.includes(activeTab) ? activeTab : captionTypes[0];
+  const currentTab = activeTagType ?? captionTypes[0];
 
   return (
     <div className="flex flex-col gap-4 max-w-4xl">
@@ -59,7 +61,7 @@ export default function CaptionsPage() {
           <button
             key={type}
             onClick={() => {
-              setActiveTab(type);
+              setActiveTagType(type);
               setSelectedTags([]);
             }}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${

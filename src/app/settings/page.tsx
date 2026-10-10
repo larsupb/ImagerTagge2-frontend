@@ -85,7 +85,7 @@ function ParamControl({
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-text focus:outline-none focus:border-ring"
         >
-          {param.options?.map((opt) => (
+          {Array.from(new Set(param.options ?? [])).map((opt) => (
             <option key={opt} value={opt}>
               {opt}
             </option>
@@ -532,6 +532,53 @@ export default function SettingsPage() {
             onBlur={() => save("vlm_endpoint", localSettings.vlm_endpoint)}
             rows={2}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text resize-y focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+          />
+        </div>
+      </Section>
+
+      <Section title="Semantic search (embeddings)">
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Base URL</label>
+          <Input
+            value={localSettings.embedding_endpoint?.base_url ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, base_url: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+            placeholder="http://localhost:11434/v1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">Model</label>
+          <Input
+            value={localSettings.embedding_endpoint?.model ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, model: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-text-secondary mb-1">API Key</label>
+          <Input
+            type="password"
+            value={localSettings.embedding_endpoint?.api_key ?? ""}
+            onChange={(e) =>
+              setLocalSettings({
+                ...localSettings,
+                embedding_endpoint: { ...localSettings.embedding_endpoint, api_key: e.target.value },
+              })
+            }
+            onBlur={() => save("embedding_endpoint", localSettings.embedding_endpoint)}
+            placeholder="Leave empty for local endpoints"
           />
         </div>
       </Section>
