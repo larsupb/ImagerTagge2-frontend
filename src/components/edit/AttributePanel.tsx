@@ -66,23 +66,25 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
 
   if (!schema || !attributes) return null;
 
-  const entries = Object.entries(schema).filter(
-    ([name, spec]) => spec.applies_to === "all" || name in attributes
-  );
+  const entries = Object.entries(schema);
   if (entries.length === 0) return null;
 
+  const count = Object.keys(attributes).length;
+
   return (
-    <div className="bg-surface rounded-lg border border-border px-4 py-2.5">
-      <span className="text-sm text-text-secondary">Attributes</span>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
+    <details className="bg-surface rounded-lg border border-border px-4 py-2.5">
+      <summary className="flex h-7 w-fit cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs text-text-secondary [&::-webkit-details-marker]:hidden">
+        Attributes{count > 0 ? ` (${count})` : ""}
+      </summary>
+      <div className="mt-2 grid grid-cols-2 gap-2">
         {entries.map(([name, spec]) => (
-          <div key={name} className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary min-w-fit">{humanize(name)}</span>
+          <div key={name} className="flex flex-col gap-1">
+            <span className="text-xs text-text-secondary">{humanize(name)}</span>
             <Select
               value={attributes[name] ?? UNSET}
               onValueChange={(value) => handleChange(name, value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="h-7 w-full text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -99,6 +101,6 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
