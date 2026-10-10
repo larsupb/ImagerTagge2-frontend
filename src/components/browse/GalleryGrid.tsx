@@ -3,13 +3,14 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare } from "lucide-react";
+import { Star, AlertTriangle, Pencil, Plus, Tag, ChevronRight, Upload, Trash2, Expand, MessageSquare, X } from "lucide-react";
 import { api, getThumbnailUrl, getMediaUrl } from "@/lib/api";
 import { humanize } from "@/lib/utils";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/projectStore";
 import { useJobsUiStore } from "@/stores/jobsUi";
 import { useActiveTagType } from "@/hooks/useActiveTagType";
+import { useTaskPolling } from "@/hooks/useTaskPolling";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
@@ -89,6 +90,7 @@ function GalleryThumbnail({
   onContextMenuUpscale,
   onContextMenuCaption,
   onContextMenuSelect,
+  score,
 }: {
   item: GalleryItem;
   isSelected: boolean;
@@ -106,6 +108,7 @@ function GalleryThumbnail({
   selectedCount: number;
   onContextMenuUpscale: (upscaler: string) => void;
   onContextMenuCaption: (tagger: string) => void;
+  score?: number;
 }) {
   const issues = getIssues(item);
   const hasIssues = issues.length > 0;
@@ -167,6 +170,12 @@ function GalleryThumbnail({
 
               {isSelected && (
                 <div className="absolute inset-0 bg-blue-500/40 pointer-events-none" />
+              )}
+
+              {score !== undefined && (
+                <span className="absolute top-1 left-1 z-10 rounded bg-black/60 px-1 py-0.5 text-[10px] leading-none text-white tabular-nums pointer-events-none">
+                  {score.toFixed(2)}
+                </span>
               )}
 
               {hasIssues && (
@@ -333,6 +342,7 @@ function CategorySection({
   onBackgroundMouseDown,
   categoryCheckState,
   onSelectCategory,
+  scores,
 }: {
   name: string | null;
   items: GalleryItem[];
@@ -358,6 +368,7 @@ function CategorySection({
   onContextMenuCaption: (tagger: string) => void;
   categoryCheckState: 'checked' | 'indeterminate' | 'unchecked';
   onSelectCategory: (select: boolean) => void;
+  scores: Map<number, number> | null;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -448,6 +459,7 @@ function CategorySection({
               onContextMenuUpscale={onContextMenuUpscale}
               onContextMenuCaption={onContextMenuCaption}
               onContextMenuSelect={onContextMenuSelect}
+              score={scores?.get(item.index)}
             />
           ))}
         </div>
@@ -742,6 +754,9 @@ export default function GalleryGrid() {
   const [promptDialog, setPromptDialog] = useState<{ open: boolean; tagger: string | null; prompt: string }>({ open: false, tagger: null, prompt: "" });
   const [attrFilters, setAttrFilters] = useState<Record<string, string>>({});
   const attrFiltersRef = useRef<HTMLDetailsElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [indexTaskId, setIndexTaskId] = useState<string | null>(null);
 
   const total = session?.datasetInfo?.total_items ?? 0;
 
@@ -787,16 +802,73 @@ export default function GalleryGrid() {
     queryFn: () => api.getAttributeSchema(),
   });
 
+  useEffect(() => {
+    const t = setTimeout(() => setSubmittedSearch(searchQuery), 500);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchStats } = useQuery({
+    queryKey: ["search-stats"],
+    queryFn: () => api.searchImages(""),
+  });
+
+  const searchQ = useQuery({
+    queryKey: ["search", submittedSearch],
+    queryFn: () => api.searchImages(submittedSearch),
+    enabled: submittedSearch.trim().length > 0,
+    retry: false,
+  });
+
+  const { task: indexTask } = useTaskPolling(indexTaskId);
+
+  const searchScores = useMemo(
+    () => new Map((searchQ.data?.results ?? []).map((r) => [r.index, r.score])),
+    [searchQ.data]
+  );
+
+  const searchItems = useMemo<GalleryItem[] | null>(() => {
+    if (!submittedSearch.trim()) return null;
+    const res = searchQ.data?.results;
+    if (!res) return [];
+    const byIndex = new Map((data?.items ?? []).map((it) => [it.index, it]));
+    return res
+      .map((r) => byIndex.get(r.index))
+      .filter((it): it is GalleryItem => !!it);
+  }, [submittedSearch, searchQ.data, data?.items]);
+
+  useEffect(() => {
+    if (searchQ.error) toast.error(searchQ.error.message);
+  }, [searchQ.error]);
+
+  useEffect(() => {
+    if (!indexTaskId || !indexTask) return;
+    if (indexTask.status === "pending" || indexTask.status === "running" || indexTask.status === "paused") return;
+    setIndexTaskId(null);
+    queryClient.invalidateQueries({ queryKey: ["search-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["search"] });
+  }, [indexTaskId, indexTask, queryClient]);
+
+  const handleIndex = useCallback(async () => {
+    try {
+      const res = await api.startIndexJob();
+      setIndexTaskId(res.task_id);
+      toast.success(`Indexing ${searchStats?.pending ?? 0} captions`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start indexing");
+    }
+  }, [searchStats?.pending]);
+
   const filteredItems = useMemo(() => {
-    const items = data?.items ?? [];
+    const items = searchItems ?? data?.items ?? [];
     const active = Object.entries(attrFilters);
     if (active.length === 0) return items;
     return items.filter((item) =>
       active.every(([name, value]) => item.attributes?.[name] === value)
     );
-  }, [data?.items, attrFilters]);
+  }, [searchItems, data?.items, attrFilters]);
 
   const grouped = useMemo<[string | null, GalleryItem[]][]>(() => {
+    if (searchItems) return [[null, filteredItems]];
     const map = new Map<string | null, GalleryItem[]>();
     for (const item of filteredItems) {
       const key = item.category ?? null;
@@ -809,7 +881,7 @@ export default function GalleryGrid() {
       if (a === null || b === null) return 0;
       return a.localeCompare(b);
     });
-  }, [filteredItems]);
+  }, [filteredItems, searchItems]);
 
   const hasCategories = grouped.some(([cat]) => cat !== null);
 
@@ -1192,6 +1264,34 @@ export default function GalleryGrid() {
               </details>
             </div>
           )}
+          <div className="relative">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Semantic search..."
+              className="h-7 w-48 text-xs pr-7"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {(searchStats?.pending ?? 0) > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleIndex}
+            >
+              Index {searchStats?.pending} captions
+            </Button>
+          )}
           {selectionCount > 0 && (
             <>
               <span className="text-text-muted text-sm">·</span>
@@ -1277,6 +1377,7 @@ export default function GalleryGrid() {
                 onBackgroundMouseDown={clearSelection}
                 categoryCheckState={categoryCheckState}
                 onSelectCategory={(select) => handleSelectCategory(items, select)}
+                scores={searchItems ? searchScores : null}
               />
             );
           })}
