@@ -87,6 +87,7 @@ export default function BatchForm() {
   const [captionType, setCaptionType] = useState("tags");
   const [skipExistingCaptions, setSkipExistingCaptions] = useState(false);
   const [classifyAttributes, setClassifyAttributes] = useState(true);
+  const [embedCaptions, setEmbedCaptions] = useState(true);
   const [vlmPrompt, setVlmPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -194,6 +195,7 @@ export default function BatchForm() {
         caption_type: captionType,
         skip_existing_captions: skipExistingCaptions,
         classify_attributes: classifyAttributes,
+        embed_captions: embedCaptions,
         vlm_prompt: vlmPrompt,
         color_match: colorMatch,
         color_match_method: colorMatchMethod,
@@ -349,6 +351,16 @@ export default function BatchForm() {
               />
               <label htmlFor="classify-attributes" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
                 Detect image attributes
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="embed-captions"
+                checked={embedCaptions}
+                onCheckedChange={(c) => setEmbedCaptions(!!c)}
+              />
+              <label htmlFor="embed-captions" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
+                Make captions searchable
               </label>
             </div>
             {tagger === "unified" && (
