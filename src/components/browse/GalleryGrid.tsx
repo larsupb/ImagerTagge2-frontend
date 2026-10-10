@@ -1138,37 +1138,50 @@ export default function GalleryGrid() {
               </SelectContent>
             </Select>
           )}
-          {Object.entries(attributeSchema ?? {}).map(([name, spec]) => (
-            <div key={name} className="flex items-center gap-1.5">
-              <span className="text-xs text-text-secondary">{humanize(name)}</span>
-              <Select
-                value={attrFilters[name] ?? ATTR_ALL}
-                onValueChange={(value) =>
-                  setAttrFilters((prev) => {
-                    const next = { ...prev };
-                    if (!value || value === ATTR_ALL) delete next[name];
-                    else next[name] = value;
-                    return next;
-                  })
-                }
-              >
-                <SelectTrigger className="h-7 w-[130px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ATTR_ALL}>All</SelectItem>
-                  <SelectItem value={ATTR_UNSET}>
-                    <span className="text-text-muted">-- unset --</span>
-                  </SelectItem>
-                  {spec.values.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {humanize(v)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {Object.keys(attributeSchema ?? {}).length > 0 && (
+            <div className="relative">
+              <details>
+                <summary className="flex h-7 cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs [&::-webkit-details-marker]:hidden">
+                  Filters{Object.keys(attrFilters).length > 0 ? ` (${Object.keys(attrFilters).length})` : ""}
+                </summary>
+                <div className="absolute z-20 mt-1 w-80 rounded-md border bg-background p-3 shadow-md">
+                  <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto">
+                    {Object.entries(attributeSchema ?? {}).map(([name, spec]) => (
+                      <div key={name} className="flex flex-col gap-1">
+                        <span className="text-xs text-text-secondary">{humanize(name)}</span>
+                        <Select
+                          value={attrFilters[name] ?? ATTR_ALL}
+                          onValueChange={(value) =>
+                            setAttrFilters((prev) => {
+                              const next = { ...prev };
+                              if (!value || value === ATTR_ALL) delete next[name];
+                              else next[name] = value;
+                              return next;
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-full text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ATTR_ALL}>All</SelectItem>
+                            <SelectItem value={ATTR_UNSET}>
+                              <span className="text-text-muted">-- unset --</span>
+                            </SelectItem>
+                            {spec.values.map((v) => (
+                              <SelectItem key={v} value={v}>
+                                {humanize(v)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </div>
-          ))}
+          )}
           {selectionCount > 0 && (
             <>
               <span className="text-text-muted text-sm">·</span>
