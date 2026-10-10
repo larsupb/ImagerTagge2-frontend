@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, getCurrentSessionId } from "@/lib/api";
-import type { BatchProgress, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem, TaskLogEntry } from "@/lib/types";
+import { api } from "@/lib/api";
+import type { BatchProgress, Upscaler, Tagger, ColorMatchPreviewItem, TaskLogEntry } from "@/lib/types";
 import { useTaskPolling } from "../../hooks/useTaskPolling";
 import ProgressLog from "./ProgressLog";
 import { HoverImage } from "@/components/shared/HoverImage";
@@ -86,6 +86,7 @@ export default function BatchForm() {
   const [unifiedCaption, setUnifiedCaption] = useState("");
   const [captionType, setCaptionType] = useState("tags");
   const [skipExistingCaptions, setSkipExistingCaptions] = useState(false);
+  const [classifyAttributes, setClassifyAttributes] = useState(true);
   const [vlmPrompt, setVlmPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -192,6 +193,7 @@ export default function BatchForm() {
         unified_caption: unifiedCaption,
         caption_type: captionType,
         skip_existing_captions: skipExistingCaptions,
+        classify_attributes: classifyAttributes,
         vlm_prompt: vlmPrompt,
         color_match: colorMatch,
         color_match_method: colorMatchMethod,
@@ -337,6 +339,16 @@ export default function BatchForm() {
               />
               <label htmlFor="skip-existing-captions" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
                 Skip images with existing caption
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="classify-attributes"
+                checked={classifyAttributes}
+                onCheckedChange={(c) => setClassifyAttributes(!!c)}
+              />
+              <label htmlFor="classify-attributes" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
+                Detect image attributes
               </label>
             </div>
             {tagger === "unified" && (
