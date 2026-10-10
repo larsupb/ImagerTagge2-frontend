@@ -16,6 +16,7 @@ import VideoPlayer from "@/components/edit/VideoPlayer";
 import NavigationBar from "@/components/edit/NavigationBar";
 import CaptionEditor from "@/components/edit/CaptionEditor";
 import CategorySelector from "@/components/edit/CategorySelector";
+import AttributePanel from "@/components/edit/AttributePanel";
 import ImageToolbar from "@/components/edit/ImageToolbar";
 import PaintToolbar from "@/components/edit/PaintToolbar";
 import MaskToolbar from "@/components/edit/MaskToolbar";
@@ -330,6 +331,8 @@ export default function EditPage() {
           setCurrentItem(activeProjectId, { ...currentItem, category });
         }}
       />
+
+      <AttributePanel filename={currentItem.filename} />
 
       <CaptionEditor
         caption={currentItem.caption}
