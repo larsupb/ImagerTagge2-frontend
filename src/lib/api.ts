@@ -5,7 +5,6 @@ import type {
   TagCloudEntry,
   SearchReplacePreview,
   Settings,
-  Tagger,
   TaggersResponse,
   Upscaler,
   BackgroundRemover,
@@ -532,6 +531,12 @@ export const api = {
   classifyAttributes: (tagger: string, onlyMissing: boolean) =>
     apiFetch<{ task_id: string }>(
       `/api/attributes/classify?tagger=${encodeURIComponent(tagger)}&only_missing=${onlyMissing}`,
+      { method: "POST" }
+    ),
+
+  classifyImage: (index: number) =>
+    apiFetch<{ index: number; filename: string; attributes: AttributeMap; failed: boolean }>(
+      `/api/attributes/classify?index=${index}`,
       { method: "POST" }
     ),
 

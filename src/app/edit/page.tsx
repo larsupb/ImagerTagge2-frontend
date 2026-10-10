@@ -332,7 +332,7 @@ export default function EditPage() {
             setCurrentItem(activeProjectId, { ...currentItem, category });
           }}
         />
-        <AttributePanel filename={currentItem.filename} />
+        <AttributePanel filename={currentItem.filename} index={currentItem.index} />
       </div>
 
       <CaptionEditor

@@ -18,14 +18,16 @@ const UNSET = "__unset__";
 
 interface AttributePanelProps {
   filename: string;
+  index: number;
 }
 
-export default function AttributePanel({ filename }: AttributePanelProps) {
+export default function AttributePanel({ filename, index }: AttributePanelProps) {
   const { data: schema } = useQuery({
     queryKey: ["attribute-schema"],
     queryFn: () => api.getAttributeSchema(),
   });
   const [attributes, setAttributes] = useState<AttributeMap | null>(null);
+  const [classifying, setClassifying] = useState(false);
   const filenameRef = useRef(filename);
 
   useEffect(() => {
@@ -64,6 +66,27 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
     }
   };
 
+  const handleAutoClassify = async () => {
+    const target = filename;
+    setClassifying(true);
+    try {
+      const res = await api.classifyImage(index);
+      if (target !== filenameRef.current) return;
+      if (res.failed) {
+        toast.error("Classification failed");
+        return;
+      }
+      const next = res.attributes;
+      setAttributes((prev) => (prev ? { ...prev, ...next } : next));
+      const n = Object.keys(next).length;
+      toast(n > 0 ? `${n} attribute${n === 1 ? "" : "s"} set` : "No attributes detected");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Classification failed");
+    } finally {
+      setClassifying(false);
+    }
+  };
+
   if (!schema || !attributes) return null;
 
   const entries = Object.entries(schema);
@@ -72,7 +95,16 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
   const count = Object.keys(attributes).length;
 
   return (
-    <details className="relative">
+    <>
+      <button
+        type="button"
+        onClick={handleAutoClassify}
+        disabled={classifying}
+        className="flex h-7 w-fit cursor-pointer items-center rounded-lg border border-input bg-transparent px-2.5 text-xs text-text-secondary hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {classifying ? "Classifying..." : "Auto-classify (VLM)"}
+      </button>
+      <details className="relative">
       <summary className="flex h-7 w-fit cursor-pointer list-none items-center rounded-lg border border-input bg-transparent px-2.5 text-xs text-text-secondary [&::-webkit-details-marker]:hidden">
         Attributes{count > 0 ? ` (${count})` : ""}
       </summary>
@@ -101,6 +133,7 @@ export default function AttributePanel({ filename }: AttributePanelProps) {
           </div>
         ))}
       </div>
-    </details>
+      </details>
+    </>
   );
 }
