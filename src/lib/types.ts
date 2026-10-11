@@ -305,6 +305,19 @@ export interface AttributeQueryResponse {
   items: AttributeQueryItem[];
 }
 
+export type FlattenedSettings = Record<string, string | number | boolean | null>;
+
+export interface ProjectConfigResponse {
+  name: string;
+  settings_overrides: Record<string, unknown>;
+  last_opened: string;
+  version: number;
+  settings: {
+    global: FlattenedSettings;
+    effective: FlattenedSettings;
+  };
+}
+
 export interface SearchResult {
   index: number;
   filename: string;

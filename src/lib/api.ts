@@ -22,6 +22,7 @@ import type {
   AttributeMap,
   AttributeQueryResponse,
   SearchResponse,
+  ProjectConfigResponse,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -566,17 +567,12 @@ export const api = {
 
   // Project config
   getProjectConfig: (projectId: string) =>
-    apiFetch<{
-      name: string;
-      settings_overrides: Record<string, unknown>;
-      last_opened: string;
-      version: number;
-    }>(`/api/projects/${projectId}/config`),
+    apiFetch<ProjectConfigResponse>(`/api/projects/${projectId}/config`),
 
-  setProjectConfig: (projectId: string, settingsOverrides: Record<string, unknown>) =>
-    apiFetch(`/api/projects/${projectId}/config`, {
+  updateProjectConfig: (projectId: string, overrides: Record<string, unknown>) =>
+    apiFetch<ProjectConfigResponse>(`/api/projects/${projectId}/config`, {
       method: "PUT",
-      body: JSON.stringify({ settings_overrides: settingsOverrides }),
+      body: JSON.stringify({ settings_overrides: overrides }),
     }),
 };
 
