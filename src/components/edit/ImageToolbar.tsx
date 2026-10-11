@@ -70,7 +70,6 @@ export default function ImageToolbar({
   const session = activeProjectId
     ? useSessionStore((s) => s.getProjectSession(activeProjectId))
     : null;
-  const setCurrentItem = useSessionStore((s) => s.setCurrentItem);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState("");

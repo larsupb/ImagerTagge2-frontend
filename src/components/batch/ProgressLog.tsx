@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { BatchProgress } from "@/lib/types";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
-import { CheckCircle, Loader2, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { CheckCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ProgressLogProps {
   entries: BatchProgress[];

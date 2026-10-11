@@ -21,7 +21,6 @@ export function HoverImage({ src, alt, className = "", previewClassName = "", pr
     const previewHeight = 620;
     const previewWidth = 820;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceRight = window.innerWidth - rect.left;
     const showAbove = spaceBelow < previewHeight + 20;
     const leftPos = Math.min(rect.left, window.innerWidth - previewWidth - 20);
     
