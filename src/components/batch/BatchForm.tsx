@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, getCurrentSessionId } from "@/lib/api";
-import type { BatchProgress, Upscaler, Tagger, ColorMatchPreviewItem, DatasetInfo, GalleryItem, TaskLogEntry } from "@/lib/types";
+import { api } from "@/lib/api";
+import type { BatchProgress, Upscaler, Tagger, ColorMatchPreviewItem, TaskLogEntry } from "@/lib/types";
 import { useTaskPolling } from "../../hooks/useTaskPolling";
 import ProgressLog from "./ProgressLog";
 import { HoverImage } from "@/components/shared/HoverImage";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import {
   Palette,
   Eye,
   Sun,
+  History,
 } from "lucide-react";
 
 interface OperationCardProps {
@@ -74,6 +76,8 @@ function OperationCard({ icon, title, description, checked, onCheckedChange, chi
 export default function BatchForm() {
   const [rename, setRename] = useState(false);
   const [renameOffset, setRenameOffset] = useState(0);
+  const [revertOriginal, setRevertOriginal] = useState(false);
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [upscale, setUpscale] = useState(false);
   const [batchUpscaler, setBatchUpscaler] = useState("");
   const [mask, setMask] = useState(false);
@@ -82,6 +86,8 @@ export default function BatchForm() {
   const [unifiedCaption, setUnifiedCaption] = useState("");
   const [captionType, setCaptionType] = useState("tags");
   const [skipExistingCaptions, setSkipExistingCaptions] = useState(false);
+  const [classifyAttributes, setClassifyAttributes] = useState(true);
+  const [embedCaptions, setEmbedCaptions] = useState(true);
   const [vlmPrompt, setVlmPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -177,6 +183,7 @@ export default function BatchForm() {
     setLogEntries([]);
     try {
       const result = await api.startBatchTask({
+        revert_original: revertOriginal,
         rename,
         rename_offset: renameOffset,
         upscale,
@@ -187,6 +194,8 @@ export default function BatchForm() {
         unified_caption: unifiedCaption,
         caption_type: captionType,
         skip_existing_captions: skipExistingCaptions,
+        classify_attributes: classifyAttributes,
+        embed_captions: embedCaptions,
         vlm_prompt: vlmPrompt,
         color_match: colorMatch,
         color_match_method: colorMatchMethod,
@@ -227,7 +236,7 @@ export default function BatchForm() {
     }
   };
 
-  const hasAnyOperation = rename || upscale || mask || caption || colorMatch || whiteBalance;
+  const hasAnyOperation = revertOriginal || rename || upscale || mask || caption || colorMatch || whiteBalance;
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -256,6 +265,20 @@ export default function BatchForm() {
             />
           </div>
         </OperationCard>
+
+        <OperationCard
+          icon={<History className="w-5 h-5" />}
+          title="Revert to original version"
+          description="Restore every image from its earliest backup and clear its version history."
+          checked={revertOriginal}
+          onCheckedChange={(checked) => {
+            if (checked) {
+              setRevertConfirmOpen(true);
+            } else {
+              setRevertOriginal(false);
+            }
+          }}
+        />
 
         <OperationCard
           icon={<ImagePlus className="w-5 h-5" />}
@@ -318,6 +341,26 @@ export default function BatchForm() {
               />
               <label htmlFor="skip-existing-captions" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
                 Skip images with existing caption
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="classify-attributes"
+                checked={classifyAttributes}
+                onCheckedChange={(c) => setClassifyAttributes(!!c)}
+              />
+              <label htmlFor="classify-attributes" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
+                Detect image attributes
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="embed-captions"
+                checked={embedCaptions}
+                onCheckedChange={(c) => setEmbedCaptions(!!c)}
+              />
+              <label htmlFor="embed-captions" className="text-sm text-text-secondary cursor-pointer whitespace-nowrap">
+                Make captions searchable
               </label>
             </div>
             {tagger === "unified" && (
@@ -549,6 +592,17 @@ export default function BatchForm() {
       </div>
 
       <ProgressLog entries={logEntries} isRunning={isRunning} />
+
+      <ConfirmDialog
+        open={revertConfirmOpen}
+        title="Revert to original version"
+        message="Every image in this batch will be restored to its very first version, and all stored versions will be deleted. This cannot be undone."
+        onConfirm={() => {
+          setRevertOriginal(true);
+          setRevertConfirmOpen(false);
+        }}
+        onCancel={() => setRevertConfirmOpen(false)}
+      />
     </div>
   );
 }

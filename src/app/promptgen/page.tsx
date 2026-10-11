@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useProjectStore } from "@/stores/projectStore";
-import { useSessionStore } from "@/stores/session";
 import { api } from "@/lib/api";
 import EmptyState from "@/components/shared/EmptyState";
 import { Input } from "@/components/ui/input";

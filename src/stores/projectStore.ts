@@ -23,7 +23,7 @@ interface ProjectStore {
   reset: () => void;
 }
 
-export const useProjectStore = create<ProjectStore>((set, get) => ({
+export const useProjectStore = create<ProjectStore>((set) => ({
   projects: [],
   activeProjectId: null,
   recentProjects: [],

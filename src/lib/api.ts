@@ -5,7 +5,6 @@ import type {
   TagCloudEntry,
   SearchReplacePreview,
   Settings,
-  Tagger,
   TaggersResponse,
   Upscaler,
   BackgroundRemover,
@@ -16,7 +15,14 @@ import type {
   ImageVersion,
   ColorMatchPreviewResult,
   BatchTask,
+  Job,
   DedupScanResponse,
+  AttributeSchema,
+  AttributeFootprint,
+  AttributeMap,
+  AttributeQueryResponse,
+  SearchResponse,
+  ProjectConfigResponse,
 } from "./types";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/projectStore";
@@ -163,10 +169,10 @@ export const api = {
     apiFetch<{ total_items: number }>(`/api/dataset/item/${index}`, { method: "DELETE" }),
 
   deleteItems: (indices: number[]) =>
-    apiFetch<{ total_items: number }>("/api/dataset/items/bulk", {
+    apiFetch<{ deleted: number; total_items: number }>("/api/dataset/items/bulk", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(indices),
+      body: JSON.stringify({ indices }),
     }),
 
   uploadImages: async (files: File[]): Promise<{ added: Array<{ index: number; filename: string }>; total_items: number }> => {
@@ -296,10 +302,10 @@ export const api = {
     apiFetch(`/api/categories/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
   // Tagging
-  generateCaption: (index: number, tagger: string) =>
+  generateCaption: (index: number, tagger: string, prompt?: string) =>
     apiFetch<{ caption: string }>("/api/tagging/generate", {
       method: "POST",
-      body: JSON.stringify({ index, tagger }),
+      body: JSON.stringify({ index, tagger, prompt }),
     }),
 
   // Processing
@@ -426,6 +432,18 @@ export const api = {
     return response.json();
   },
 
+  // Jobs
+  listJobs: () => apiFetch<Job[]>("/api/jobs"),
+
+  pauseJob: (jobId: string) =>
+    apiFetch<{ paused: boolean }>(`/api/jobs/${jobId}/pause`, { method: "POST" }),
+
+  resumeJob: (jobId: string) =>
+    apiFetch<{ paused: boolean }>(`/api/jobs/${jobId}/resume`, { method: "POST" }),
+
+  cancelJob: (jobId: string) =>
+    apiFetch<{ cancelled: boolean }>(`/api/jobs/${jobId}`, { method: "DELETE" }),
+
   analyzeBuckets: (resolution = 1024, step = 64, maxSteps = 4, categories?: string[]) =>
     apiFetch<BucketResult>("/api/batch/analyze-buckets", {
       method: "POST",
@@ -491,6 +509,48 @@ export const api = {
       }),
     }),
 
+  // Attributes
+  getAttributeSchema: () => apiFetch<AttributeSchema>("/api/attributes/schema"),
+
+  getAttributeFootprint: () => apiFetch<AttributeFootprint>("/api/attributes/footprint"),
+
+  getAttributes: (filename: string) =>
+    apiFetch<{ filename: string; attributes: AttributeMap }>(
+      `/api/attributes?filename=${encodeURIComponent(filename)}`
+    ),
+
+  queryAttributes: (filters: Record<string, string>, limit = 100, offset = 0) => {
+    const params = new URLSearchParams({ ...filters, limit: String(limit), offset: String(offset) });
+    return apiFetch<AttributeQueryResponse>(`/api/attributes/query?${params.toString()}`);
+  },
+
+  setAttributes: (filename: string, attributes: Record<string, string | null>) =>
+    apiFetch<{ id: number; filename: string; attributes: AttributeMap }>("/api/attributes", {
+      method: "PUT",
+      body: JSON.stringify({ filename, attributes }),
+    }),
+
+  classifyAttributes: (tagger: string, onlyMissing: boolean) =>
+    apiFetch<{ task_id: string }>(
+      `/api/attributes/classify?tagger=${encodeURIComponent(tagger)}&only_missing=${onlyMissing}`,
+      { method: "POST" }
+    ),
+
+  classifyImage: (index: number) =>
+    apiFetch<{ index: number; filename: string; attributes: AttributeMap; failed: boolean }>(
+      `/api/attributes/classify?index=${index}`,
+      { method: "POST" }
+    ),
+
+  // Search
+  searchImages: (q: string, minScore = 0, limit = 200) => {
+    const params = new URLSearchParams({ q, min_score: String(minScore), limit: String(limit) });
+    return apiFetch<SearchResponse>(`/api/search?${params.toString()}`);
+  },
+
+  startIndexJob: () =>
+    apiFetch<{ task_id: string }>("/api/search/index", { method: "POST" }),
+
   // Media URLs
   mediaUrl: getMediaUrl,
   thumbnailUrl: getThumbnailUrl,
@@ -507,17 +567,12 @@ export const api = {
 
   // Project config
   getProjectConfig: (projectId: string) =>
-    apiFetch<{
-      name: string;
-      settings_overrides: Record<string, unknown>;
-      last_opened: string;
-      version: number;
-    }>(`/api/projects/${projectId}/config`),
+    apiFetch<ProjectConfigResponse>(`/api/projects/${projectId}/config`),
 
-  setProjectConfig: (projectId: string, settingsOverrides: Record<string, unknown>) =>
-    apiFetch(`/api/projects/${projectId}/config`, {
+  updateProjectConfig: (projectId: string, overrides: Record<string, unknown>) =>
+    apiFetch<ProjectConfigResponse>(`/api/projects/${projectId}/config`, {
       method: "PUT",
-      body: JSON.stringify({ settings_overrides: settingsOverrides }),
+      body: JSON.stringify({ settings_overrides: overrides }),
     }),
 };
 

@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FolderOpen, X, Plus } from "lucide-react";
+import { FolderOpen, X, Plus, Settings } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { Button } from "@/components/ui/button";
+import JobsIndicator from "@/components/jobs/JobsIndicator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import GlobalSettingsForm from "@/components/settings/GlobalSettingsForm";
 import { toast } from "sonner";
 
 export default function ProjectTabs() {
@@ -35,7 +38,8 @@ export default function ProjectTabs() {
 
   return (
     <div className="flex flex-col border-b border-border bg-surface">
-      <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
         {projects.map((project) => {
           const isActive = project.session_id === activeProjectId;
           return (
@@ -78,6 +82,25 @@ export default function ProjectTabs() {
             Open Project
           </Button>
         )}
+        </div>
+        <div className="shrink-0 flex items-center gap-1 pl-2">
+          <Dialog>
+            <DialogTrigger
+              className="p-2 rounded-md text-text-secondary hover:text-text hover:bg-surface-raised transition-colors"
+              aria-label="Global settings"
+              title="Global settings"
+            >
+              <Settings className="w-4 h-4" />
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Global Settings</DialogTitle>
+              </DialogHeader>
+              <GlobalSettingsForm />
+            </DialogContent>
+          </Dialog>
+          <JobsIndicator />
+        </div>
       </div>
       {showOpenDialog && (
         <div className="flex items-center gap-2 px-2 pb-2">
